@@ -1,0 +1,14 @@
+services:
+  yolo_service:
+    build: ./WildDetector     # Use the Dockerfile in the specified directory
+    container_name: wild_yolo
+    privileged: true
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./models/:/usr/src/ultralytics/models/
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev:/dev
+      - /etc/localtime:/etc/localtime:ro
+    runtime: nvidia       # Enables GPU-accelerated workloads, without this runtime the container cannot utilize GPU hardware
+    network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access
