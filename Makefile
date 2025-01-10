@@ -9,7 +9,7 @@ clean: down
 cleanall: clean
 	docker system prune --all --volumes --force
 
-up:
+up: build
 	docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 
 down:

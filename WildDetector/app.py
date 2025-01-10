@@ -1,247 +1,224 @@
+from flask import Flask, request, jsonify, Response
 import os
-import json
-import requests
-from flask import Flask, request, render_template, Response, jsonify
-from ultralytics import YOLO
-import cv2
-import uuid
 import time
+import threading
+import cv2
+from ultralytics import YOLO
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'static/uploads/'
-CUSTOM_MODEL_FOLDER = 'static/custom_models/'
-MODEL_FOLDER = 'models/'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['CUSTOM_MODEL_FOLDER'] = CUSTOM_MODEL_FOLDER
-app.config['MODEL_FOLDER'] = MODEL_FOLDER
 
+# Status variables
+RUNNING_PORT = 5000
+STATUS = 'idle'
+SOURCE_HELP = 'http://10.200.3.28:5010/stream_raw'
+SOURCE_CAMERA = 0   # Refer to '/dev/video0'
+MODEL_FOLDER = 'models/'
+MODEL = YOLO(f'{MODEL_FOLDER}Yolov11/yolo11m-pose.pt')
+# For adhering to Flask's best practices TODO add all
+app.config['STATUS'] = STATUS
+app.config['SOURCE_CAMERA'] = SOURCE_CAMERA
+app.config['MODEL_FOLDER'] = MODEL_FOLDER
 # Ensure directories exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(CUSTOM_MODEL_FOLDER, exist_ok=True)
 os.makedirs(MODEL_FOLDER, exist_ok=True)
 
-current_model = None
-camera_on = False
-input_source = None
-cap = None
-is_image = False
-fps_value = 0  # Global variable to store FPS
-loading = 0
-results_store = []  # Store results globally
+def generate_frames(infer=False):
+    cap = cv2.VideoCapture(SOURCE_CAMERA)
 
-# Define available YOLO models by version
-model_versions = {
-    'Yolov5': ['yolov5nu', 'yolov5su', 'yolov5mu', 'yolov5lu', 'yolov5xu'],
-    'Yolov8': [
-        'yolov8n', 'yolov8s', 'yolov8m', 'yolov8l', 'yolov8x',
-        'yolov8n-seg', 'yolov8s-seg', 'yolov8m-seg', 'yolov8l-seg', 'yolov8x-seg',
-        'yolov8n-pose', 'yolov8s-pose', 'yolov8m-pose', 'yolov8l-pose', 'yolov8x-pose',
-        'yolov8n-obb', 'yolov8s-obb', 'yolov8m-obb', 'yolov8l-obb', 'yolov8x-obb',
-        'yolov8n-cls', 'yolov8s-cls', 'yolov8m-cls', 'yolov8l-cls', 'yolov8x-cls'
-    ],
-    'Yolov11': [
-        'yolo11n', 'yolo11s', 'yolo11m', 'yolo11l', 'yolo11x',
-        'yolo11n-seg', 'yolo11s-seg', 'yolo11m-seg', 'yolo11l-seg', 'yolo11x-seg',
-        'yolo11n-pose', 'yolo11s-pose', 'yolo11m-pose', 'yolo11l-pose', 'yolo11x-pose',
-        'yolo11n-obb', 'yolo11s-obb', 'yolo11m-obb', 'yolo11l-obb', 'yolo11x-obb',
-        'yolo11n-cls', 'yolo11s-cls', 'yolo11m-cls', 'yolo11l-cls', 'yolo11x-cls'
-    ]
-}
-
-def download_model(model_path):
-    # 获取模型文件的目录（不包括文件名）
-    model_dir = os.path.dirname(model_path)
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    
-    # 仅当模型文件不存在时下载
-    if not os.path.exists(model_path):
-        print(f"Model {model_path} not found, downloading...")
-        model_name = os.path.basename(model_path)
-        # 如果是 YOLOv8，则可以直接下载
-        if 'yolov8' in model_name:
-            YOLO(model_name)
-        else:
-            print(f"Please manually download {model_name} and place it in {model_dir}")
-    else:
-        print(f"Model {model_path} already exists, skipping download.")
-
-    # 返回加载的模型对象
-    return YOLO(model_path)
-
-@app.route('/')
-def index():
-    return render_template('index.html', model_versions=model_versions)
-
-@app.route('/loading_status')
-def loading_status():
-    global loading
-    return jsonify({'loading': loading})
-
-@app.route('/detect', methods=['POST'])
-def detect():
-    global current_model, camera_on, input_source, cap, is_image, results_store
-    model_version = request.form.get('version')
-    model_choice = request.form.get('model')
-    input_type = request.form.get('input_type')
-    tensorrt_enabled = request.form.get('tensorrt') == 'true'  # Check TensorRT option
-
-    if model_choice == 'custom':
-        # 用户选择了自定义模型
-        custom_model_file = request.files.get('custom_model')
-        if custom_model_file:
-            custom_model_filename = f"{uuid.uuid4()}_{custom_model_file.filename}"
-            custom_model_path = os.path.join(app.config['CUSTOM_MODEL_FOLDER'], model_version, custom_model_filename)
-            os.makedirs(os.path.dirname(custom_model_path), exist_ok=True)
-            custom_model_file.save(custom_model_path)
-            print(f"Custom model uploaded to {custom_model_path}")
-            model_path = custom_model_path  # Use the custom model
-        else:
-            return jsonify({'error': 'No custom model file uploaded'})
-    else:
-        # 使用预定义的模型
-        if model_version and model_choice:
-            model_path = os.path.join(app.config['MODEL_FOLDER'], model_version, f"{model_choice}.pt")
-        else:
-            return jsonify({'error': 'No valid version or model selected'})
-
-    # 检查并下载模型（如果需要）
-    if model_choice != 'custom':
-        current_model = download_model(model_path)
-    else:
-        current_model = YOLO(model_path)
-
-    # 处理 TensorRT 转换
-    if tensorrt_enabled:
-        engine_path = model_path.replace('.pt', '.engine')
-        if os.path.exists(engine_path):
-            current_model = YOLO(engine_path)
-        else:
-            print(f"Exporting model {model_path} to TensorRT format...")
-            model = YOLO(model_path)
-            model.export(format='engine', device=0)  # 指定设备
-            while not os.path.exists(engine_path):
-                time.sleep(1)
-            print(f"TensorRT engine exported and saved to {engine_path}")
-            current_model = YOLO(engine_path)
-    else:
-        current_model = YOLO(model_path)
-
-    # Reset state for new detection
-    if cap is not None:
-        cap.release()
-        cap = None
-    input_source = None
-    camera_on = False
-    is_image = False
-
-    # Handle input types (image, video, webcam)
-    if input_type == 'image':
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file part'})
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No selected file'})
-        if file:
-            filename = f"{uuid.uuid4()}_{file.filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            input_source = filepath
-            is_image = True
-            return jsonify({'image': True})
-    elif input_type == 'video':
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file part'})
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No selected file'})
-        if file:
-            filename = f"{uuid.uuid4()}_{file.filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            input_source = filepath
-            camera_on = True
-            cap = cv2.VideoCapture(input_source)
-            return jsonify({'video': True})
-    elif input_type == 'webcam':
-        input_source = 0
-        camera_on = True
-        cap = cv2.VideoCapture(input_source)
-        return jsonify({'webcam': True})
-
-    return jsonify({'error': 'Invalid input type'})
-
-@app.route('/stop_camera', methods=['POST'])
-def stop_camera():
-    global camera_on, cap
-    camera_on = False
-    if cap is not None:
-        cap.release()
-        cap = None
-    return jsonify({'stopped': True})
-
-def generate_frames(model):
-    global camera_on, input_source, cap, is_image, fps_value, loading, results_store
-    prev_frame_time = 0
-    new_frame_time = 0
-
-    if is_image:
-        img = cv2.imread(input_source)
-        results = model(img)
-        loading = 1
-        for result in results:
-            annotated_frame = result.plot()
-            results_store = {
-                'inference_time': result.speed['inference'],
-                'boxes': result.boxes.data.tolist() if result.boxes else [],
-                'keypoints': result.keypoints.data.tolist() if result.keypoints else [],
-                'masks': result.masks.data.tolist() if result.masks else [],
-                'names': result.names,
-                'path': result.path,
-            }
-        _, buffer = cv2.imencode('.jpg', annotated_frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    if not cap.isOpened():
+        print("Error: Unable to access the video feed. Is the raw stream active?")
         return
 
-    while camera_on:
-        success, frame = cap.read()
-        if not success:
+    # Initialize FPS calculation
+    frame_count = 0
+    start_time = time.time()
+    fps = 0  # Initialize fps to avoid reference before assignment
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    # Verify the settings
+    current_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    current_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    current_fps = cap.get(cv2.CAP_PROP_FPS)
+
+    print(f"Resolution: {current_width}x{current_height}")
+    print(f"Frame Rate (FPS): {current_fps}")
+
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    while STATUS == "streaming_infer" if infer else "streaming_raw":
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Unable to read frame from the video feed.")
             break
-        new_frame_time = time.time()
-        results = model(frame)
-        loading = 1
-        for result in results:
-            annotated_frame = result.plot()
-            results_store = {
-                'inference_time': result.speed['inference'],
-                'boxes': result.boxes.data.tolist() if result.boxes else [],
-                'keypoints': result.keypoints.data.tolist() if result.keypoints else [],
-                'masks': result.masks.data.tolist() if result.masks else [],
-                'names': result.names,
-                'path': result.path,
-            }
-            fps_value = 1000/result.speed['inference']
-            prev_frame_time = new_frame_time
 
-        _, buffer = cv2.imencode('.jpg', annotated_frame)
-        frame = buffer.tobytes()
+        # Get frame size
+        height, width, _ = frame.shape
+
+        # Update the frame count
+        frame_count += 1
+
+        # Calculate FPS every second
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= 1.0:
+            fps = frame_count / elapsed_time
+            frame_count = 0
+            start_time = time.time()
+
+        # Overlay FPS, image size, and camera FPS on the frame
+        cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Cam FPS: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        if infer:
+            results = MODEL.predict(source=frame)
+            frame = results[0].plot()
+
+        # Encode the frame as JPEG
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(current_model), mimetype='multipart/x-mixed-replace; boundary=frame')
+    cap.release()
 
-@app.route('/results')
-def get_results():
-    global results_store, fps_value
-    results = {
-        'results': results_store,
-        'fps': fps_value,
-    }
-    return jsonify(results)
+def help_frames(infer=True):
 
-if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    if SOURCE_HELP == 'none':
+        print("None source provided!")
+        return
+
+    cap = cv2.VideoCapture(SOURCE_HELP)
+
+    if not cap.isOpened():
+        print("Error: Unable to access the video feed. Invalid source provided or raw stream active?")
+        return
+
+    # Initialize FPS calculation
+    frame_count = 0
+    start_time = time.time()
+    fps = 0  # Initialize fps to avoid reference before assignment
+
+    # Get the settings
+    current_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    current_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    current_fps = cap.get(cv2.CAP_PROP_FPS)
+
+    print(f"Resolution: {current_width}x{current_height}")
+    print(f"Frame Rate (FPS): {current_fps}")
+
+    while infer:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Unable to read frame from the video feed.")
+            break
+
+        # Get frame size
+        height, width, _ = frame.shape
+
+        # Update the frame count
+        frame_count += 1
+
+        # Calculate FPS every second
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= 1.0:
+            fps = frame_count / elapsed_time
+            frame_count = 0
+            start_time = time.time()
+
+        # Overlay FPS, image size, and camera FPS on the frame
+        cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(frame, f"Cam FPS: {current_fps:.2f}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        if infer:
+            results = MODEL.predict(source=frame)
+            frame = results[0].plot()
+
+        # Encode the frame as JPEG
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    cap.release()
+
+@app.route("/stream_raw")   # tutta via il controllo dello stato e solo quando inizia, se gia partitio non ferma il flusso faw
+def stream_raw():
+    global STATUS
+    if STATUS != "streaming_raw":
+        return "Raw stream not active", 400
+    return Response(generate_frames(infer=False), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/stream_infer")
+def stream_infer():
+    global STATUS
+    if STATUS != "streaming_infer":
+        return "Inferred stream not active", 400
+    return Response(generate_frames(infer=True), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/stream_help")
+def streaming_help():
+    global STATUS
+    if STATUS != "streaming_help":
+        return "Inferred help stream not active", 400
+    return Response(help_frames(infer=True), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/set_env", methods=["POST"])
+def set_env():
+    value = request.form.get("value")
+    if value:
+        os.environ["SOURCE_HELP"] = value
+        SOURCE_HELP = value
+        return f"SOURCE_HELP set to {value}", 200
+    return "Invalid value", 400
+
+@app.route("/change_status", methods=["POST"])
+def change_status():
+    global STATUS
+    status = request.form.get("status")
+    if status not in ["idle", "streaming_raw", "streaming_infer", "streaming_help"]:
+        return "Invalid status", 400
+
+    # Stop existing streaming threads
+    STATUS = "idle"  # Force stopping current streams
+    threading.Event().wait(1)
+
+    if status == "streaming_raw":
+        STATUS = "streaming_raw"
+        threading.Thread(target=generate_frames, args=(5001, False)).start()
+    elif status == "streaming_infer":
+        STATUS = "streaming_infer"
+        threading.Thread(target=generate_frames, args=(5002, True)).start()
+    elif status == "streaming_help":
+        STATUS = "streaming_help"
+        threading.Thread(target=help_frames, args=(5002, True)).start()
+    else:
+        STATUS = "idle"
+
+    return f"Status changed to {STATUS}", 200
+
+@app.route("/")
+def home():
+    return """
+    <h1>Flask UltraLytics Control Panel</h1>
+    <form action="/set_env" method="POST">
+        <label>Set SOURCE_HELP:</label>
+        <input type="text" name="value">
+        <button type="submit">Set</button>
+    </form>
+    <form action="/change_status" method="POST">
+        <label>Change Status:</label>
+        <select name="status">
+            <option value="idle">Idle</option>
+            <option value="streaming_raw">Stream Raw</option>
+            <option value="streaming_infer">Stream Inferred</option>
+            <option value="streaming_help">Help Inferred</option>
+        </select>
+        <button type="submit">Change</button>
+    </form>
+    <p>Current Status: {}</p>
+    """.format(STATUS)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=RUNNING_PORT)

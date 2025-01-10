@@ -7,7 +7,7 @@
     - **`EABI: XXXXXXX`**: Application Binary Interface.
     - **`DATE: XXXXXXXX`**: Build date and time.
 
-The difference between the Docker images `ultralytics/ultralytics:latest-jetson-jetpackX` and `ultralytics/ultralytics:latest` lies in their target hardware, software environment, and optimizations:
+The difference between the Docker images `ultralytics/ultralytics:latest` and `ultralytics/ultralytics:latest-jetson-jetpackX` lies in their target hardware, software environment, and optimizations:
 
 ### Key Differences
 
