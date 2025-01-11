@@ -1,19 +1,19 @@
-from flask import Flask, request, jsonify, Response
 import os
+import cv2
 import time
 import threading
-import cv2
 from ultralytics import YOLO
+from flask import Flask, request, jsonify, Response, redirect
 
 app = Flask(__name__)
 
 # Status variables
-RUNNING_PORT = 5000
+RUNNING_PORT = 5050
 STATUS = 'idle'
-SOURCE_HELP = 'http://10.200.3.28:5010/stream_raw'
+SOURCE_HELP = 'none'
 SOURCE_CAMERA = 0   # Refer to '/dev/video0'
 MODEL_FOLDER = 'models/'
-MODEL = YOLO(f'{MODEL_FOLDER}Yolov11/yolo11m-pose.pt')
+MODEL = YOLO(f'{MODEL_FOLDER}Yolov11/yolo11m.pt')
 # For adhering to Flask's best practices TODO add all
 app.config['STATUS'] = STATUS
 app.config['SOURCE_CAMERA'] = SOURCE_CAMERA
@@ -166,12 +166,13 @@ def streaming_help():
 
 @app.route("/set_env", methods=["POST"])
 def set_env():
+    global USEFULL_VAR  # Use the global variable to update it
+    old_val = USEFULL_VAR
     value = request.form.get("value")
     if value:
-        os.environ["SOURCE_HELP"] = value
-        SOURCE_HELP = value
-        return f"SOURCE_HELP set to {value}", 200
-    return "Invalid value", 400
+        USEFULL_VAR = value
+        return f"USEFULL_VAR set from '{old_val}' to '{value}'", 200
+    return "Invalid value, can't be empty", 400
 
 @app.route("/change_status", methods=["POST"])
 def change_status():
