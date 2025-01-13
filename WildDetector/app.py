@@ -3,12 +3,14 @@ import cv2
 import json
 import time
 import torch
+import torch.nn as nn
 import datetime
 import threading
 import numpy as np
 from torchvision import transforms
 import torchvision
 from ultralytics import YOLO
+from ultralytics.engine.results import Results
 from collections import defaultdict
 from flask import Flask, request, jsonify, Response, redirect # type: ignore
 
@@ -20,7 +22,7 @@ STATUS = 'get_raw'                                         # Default camera
 SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
 SOURCE_DATA = '/dev/video0'                                    # Customize for the inference source
 MODEL_FOLDER = 'models/'
-MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11m.pt')          # print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)
+MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
 HEAD = MODEL.model.model[2]                             # Head part of the model
@@ -126,7 +128,8 @@ def generate_inf():
             break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
         results = MODEL.predict(source=frame)
-
+        print(results)
+        break
         frame_count += 1                                        # Update the frame count
         if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
             elapsed_time = time.perf_counter() - start_time
@@ -198,28 +201,168 @@ def consume_raw():
         # Convert to Tensor and add batch dimension
         transform = transforms.ToTensor()
         frame_tensor = transform(frame_normalized).unsqueeze(0)  # Add batch dimension
+
+        print(frame_tensor.shape)
+        # Pre-process the frame to match YOLO input size
+        input_tensor = cv2.resize(frame, (640, 640))
+        input_tensor = input_tensor[..., ::-1]                            # Convert BGR to RGB
+        input_tensor = np.copy(input_tensor)                              # Create a copy of the array to avoid negative strides
+        input_tensor = np.transpose(input_tensor, (2, 0, 1))              # Change to (C, H, W)
+        input_tensor = np.expand_dims(input_tensor, axis=0)               # Add batch dimension
+        input_tensor = torch.from_numpy(input_tensor).float() / 255.0     # Normalize to [0, 1]
+        print(input_tensor.shape)
+        print("QUI")
+        print(frame_tensor)
+        print("QUI")
+        print(input_tensor)
+        print("QUI")
+
         frame_tensor = frame_tensor.to(torch.double)  # Convert to torch.Double
 
+        # print(MODEL.model)  # https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml
         # Pass through the backbone
-        backbone_out = MODEL.model.model[:10](frame_tensor.to(torch.double))  # Backbone layers
-        # Pass through neck (if applicable)
-        neck_out = MODEL.model.model[10:20](backbone_out)  # Neck layers
-        # Pass through head (prediction layers)
-        head_out = MODEL.model.model[20:](neck_out)  # Head layers
+        print(input_tensor.shape)
+        b0 = MODEL.model.model[0](input_tensor)
+        print(f"{b0.shape}-0")
+        b1 = MODEL.model.model[1](b0)
+        print(f"{b1.shape}-1")
+        b2 = MODEL.model.model[2](b1)
+        print(f"{b2.shape}-2")
+        b3 = MODEL.model.model[3](b2)
+        print(f"{b3.shape}-3")
+        b4 = MODEL.model.model[4](b3)
+        print(f"{b4.shape}-4")
+        b5 = MODEL.model.model[5](b4)
+        print(f"{b5.shape}-5")
+        b6 = MODEL.model.model[6](b5)
+        print(f"{b6.shape}-6")
+        b7 = MODEL.model.model[7](b6)
+        print(f"{b7.shape}-7")
+        b8 = MODEL.model.model[8](b7)
+        print(f"{b8.shape}-8")
+        b9 = MODEL.model.model[9](b8)
+        print(f"{b9.shape}-9")
+        b10 = MODEL.model.model[10](b9)
+        print(f"{b10.shape}-10")
+        b11 = MODEL.model.model[11](b10)
+        print(f"{b11.shape}-11")
+        b12 = MODEL.model.model[12]([b11,b6])
+        print(f"{b12.shape}-12")
+        b13 = MODEL.model.model[13](b12)
+        print(f"{b13.shape}-13")
+        b14 = MODEL.model.model[14](b13)
+        print(f"{b14.shape}-14")
+        b15 = MODEL.model.model[15]([b14,b4])
+        print(f"{b15.shape}-15")
+        b16 = MODEL.model.model[16](b15)
+        print(f"{b16.shape}-16")
+        b17 = MODEL.model.model[17](b16)
+        print(f"{b17.shape}-17")
+        b18 = MODEL.model.model[18]([b17,b13])
+        print(f"{b18.shape}-18")
+        b19 = MODEL.model.model[19](b18)
+        print(f"{b19.shape}-19")
+        b20 = MODEL.model.model[20](b19)
+        print(f"{b20.shape}-20")
+        b21 = MODEL.model.model[21]([b20,b10])
+        print(f"{b21.shape}-21")
+        b22 = MODEL.model.model[22](b21)
+        print(f"{b22.shape}-22")
+        b23 = MODEL.model.model[23]([b16,b19,b22])
+        # b23[0]: Primary predictions (e.g., processed for object detection).
+        # b23[1]: Feature maps used for further calculations or analysis (e.g., visualization, debugging, additional model layers).
+        if isinstance(b23, (list, tuple)):
+            for i, tensor in enumerate(b23):
+                print(f"Type of element {i} in b23: {type(tensor)}")
+                if isinstance(tensor, torch.Tensor):
+                    print(f"Shape of tensor {i} in b23: {tensor.shape}")
+                elif isinstance(tensor, list):
+                    print(f"Element {i} in b23 is a list with length: {len(tensor)}")
+                else:
+                    print(f"Unexpected type for element {i}: {type(tensor)}")
+        else:
+            print("Unexpected output type for b23:", type(b23))
 
-        head_out = head_out[head_out[..., 4] > 0.5]
-        boxes = head_out[..., :4]
-        scores = head_out[..., 4] * head_out[..., 5]  # Objectness * class score
-        class_ids = head_out[..., 5].argmax(dim=-1)
-        keep = torchvision.ops.nms(boxes, scores, 0.45)
-        final_boxes = boxes[keep]
-        final_scores = scores[keep]
-        final_class_ids = class_ids[keep]
+        if isinstance(b23, (list, tuple)):
+            for i, item in enumerate(b23):
+                if isinstance(item, list):
+                    for j, sub_item in enumerate(item):
+                        print(f"Type of sub-item {j} in list at b23[{i}]: {type(sub_item)}")
+                        if isinstance(sub_item, torch.Tensor):
+                            print(f"Shape of sub-item {j}: {sub_item.shape}")
 
-        print(final_boxes.shape)
-        print(final_scores.shape)
-        print(final_class_ids.shape)
-        break
+
+        ###### postprocess
+        # Assuming `model` is the YOLO model and `b23[0]` contains predictions
+        predictions = b23[0]  # Raw output tensor of shape [batch_size, num_classes + 5, num_detections]
+
+        # # Post-process predictions
+        # boxes = []
+        # for pred in predictions[0]:  # Assuming batch size is 1
+        #     x_center, y_center, w, h = pred[:4]  # Box coordinates
+        #     score = pred[4]  # Objectness score
+        #     class_scores = pred[5:]  # Class scores
+        #     class_id = torch.argmax(class_scores)
+        #     final_score = score * class_scores[class_id]
+            
+        #     # Convert to [x1, y1, x2, y2] format
+        #     x1 = x_center - w / 2
+        #     y1 = y_center - h / 2
+        #     x2 = x_center + w / 2
+        #     y2 = y_center + h / 2
+
+        #     print([x1, y1, x2, y2, final_score, class_id])
+        #     # Append as [x1, y1, x2, y2, conf, cls]
+        #     boxes.append([x1, y1, x2, y2, final_score, class_id])
+
+        # # Convert to tensor
+        # boxes_tensor = torch.tensor(boxes)  # Shape: [num_detections, 6]
+
+        # class_ids = boxes_tensor[:, -1].unique().tolist()  # Extract unique class IDs
+        
+        # print("Unique class IDs in predictions:", class_ids)
+        # print("Class IDs in predictions:", boxes_tensor)
+
+        boxes, confidences, class_probs = predictions[:, :4], predictions[:, 4], predictions[:, 5:]
+
+        # Flatten boxes and scores to handle the batch dimension properly
+        boxes = boxes.reshape(-1, 4)  # Flatten the boxes to shape [num_predictions, 4]
+        confidences = confidences.flatten()  # Flatten the scores to shape [num_predictions]
+        class_probs = class_probs.flatten()  # Flatten the classes to shape [num_predictions]
+
+        # Filter predictions by confidence threshold
+        mask = confidences > 0.5
+        boxes, confidences, class_probs = boxes[mask], confidences[mask], class_probs[mask]
+        
+        # Compute class probabilities and class IDs
+        class_ids = torch.argmax(class_probs, dim=1)
+        scores = confidences * torch.max(class_probs, dim=1).values
+
+        # # Apply Non-Maximum Suppression (NMS)
+        # keep_indices = nms(boxes, scores, IOU_THRESH)
+        # boxes, class_ids, scores = boxes[keep_indices], class_ids[keep_indices], scores[keep_indices]
+
+        # print(MODEL.names)
+        my_dict = {i: str(i) for i in range(10001)}
+        results = Results(path=None, orig_img=frame,boxes=boxes, names=my_dict)
+
+        # # Pass through neck (if applicable)
+        # neck_out = MODEL.model.model[10:20](b6)  # Neck layers
+        # # Pass through head (prediction layers)
+        # head_out = MODEL.model.model[20:](neck_out)  # Head layers
+
+        # head_out = head_out[head_out[..., 4] > 0.5]
+        # boxes = head_out[..., :4]
+        # scores = head_out[..., 4] * head_out[..., 5]  # Objectness * class score
+        # class_ids = head_out[..., 5].argmax(dim=-1)
+        # keep = torchvision.ops.nms(boxes, scores, 0.45)
+        # final_boxes = boxes[keep]
+        # final_scores = scores[keep]
+        # final_class_ids = class_ids[keep]
+
+        # print(final_boxes.shape)
+        # print(final_scores.shape)
+        # print(final_class_ids.shape)
 
         # backbone_layers = MODEL.model.model[:10]  # Layers 0 to 9 for the backbone
         # neck_layers = MODEL.model.model[10:20]   # Layers 10 to 19 for the neck
@@ -252,6 +395,27 @@ def consume_raw():
 
         # # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
         # #-----------------------------------------------------------------------------------------------------#
+
+        # def debug_forward(model, x):
+        #     y, dt = [], []  # outputs
+        #     for _ in range(len(model.model)):  # Initialize outputs for all layers
+        #         y.append(None)
+
+        #     for i, m in enumerate(model.model):
+        #         print(f"Processing layer {i}: {m}")
+
+        #         if m.f != -1:  # If the layer has dependencies
+        #             x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]
+        #             print(f"Layer {i} inputs: {m.f}, shapes: "
+        #                 f"{[y[j].shape if y[j] is not None else 'None' for j in m.f]}")
+
+        #         y[i] = m(x)
+        #         print(f"Layer {i} output shape: {y[i].shape if y[i] is not None else 'None'}")
+
+        #     return y
+        
+        # debug_forward(MODEL.model, input_tensor)
+
 
         # # print(MODEL)
         # # print(MODEL.model)
@@ -364,6 +528,9 @@ def consume_raw():
         # # (boxes, scores, classes, frame) in the expected format
         # results = [YOLO.Results(frame, boxes=filtered_boxes, scores=filtered_scores, classes=filtered_classes)]
 
+        # results = MODEL.predict(source=frame)
+        # print(type(results[0]))
+        # print(results[0].shape)
         frame = results[0].plot()   # used to overlay the results (such as bounding boxes, class labels, or other annotations) onto the image
 
         # Encode the frame as JPEG

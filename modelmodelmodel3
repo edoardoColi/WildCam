@@ -1,5 +1,0 @@
-yolo_dev1  | Conv(
-yolo_dev1  |   (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
-yolo_dev1  |   (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
-yolo_dev1  |   (act): SiLU(inplace=True)
-yolo_dev1  | )
