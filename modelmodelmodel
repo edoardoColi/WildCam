@@ -1,0 +1,531 @@
+yolo_dev1  | Sequential(
+yolo_dev1  |   (0): Conv(
+yolo_dev1  |     (conv): Conv2d(3, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(16, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (1): Conv(
+yolo_dev1  |     (conv): Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (2): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(48, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): Bottleneck(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(16, 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(8, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(8, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(16, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (3): Conv(
+yolo_dev1  |     (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (4): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(96, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): Bottleneck(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(32, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(16, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(16, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (5): Conv(
+yolo_dev1  |     (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (6): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): C3k(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 32, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 32, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv3): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (m): Sequential(
+yolo_dev1  |           (0): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |           (1): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (7): Conv(
+yolo_dev1  |     (conv): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (8): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(384, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): C3k(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv3): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (m): Sequential(
+yolo_dev1  |           (0): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |           (1): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (9): SPPF(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(512, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): MaxPool2d(kernel_size=5, stride=1, padding=2, dilation=1, ceil_mode=False)
+yolo_dev1  |   )
+yolo_dev1  |   (10): C2PSA(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): Sequential(
+yolo_dev1  |       (0): PSABlock(
+yolo_dev1  |         (attn): Attention(
+yolo_dev1  |           (qkv): Conv(
+yolo_dev1  |             (conv): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): Identity()
+yolo_dev1  |           )
+yolo_dev1  |           (proj): Conv(
+yolo_dev1  |             (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): Identity()
+yolo_dev1  |           )
+yolo_dev1  |           (pe): Conv(
+yolo_dev1  |             (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): Identity()
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (ffn): Sequential(
+yolo_dev1  |           (0): Conv(
+yolo_dev1  |             (conv): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): Identity()
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (11): Upsample(scale_factor=2.0, mode='nearest')
+yolo_dev1  |   (12): Concat()
+yolo_dev1  |   (13): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(384, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): Bottleneck(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (14): Upsample(scale_factor=2.0, mode='nearest')
+yolo_dev1  |   (15): Concat()
+yolo_dev1  |   (16): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(96, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): Bottleneck(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(32, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(16, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(16, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (17): Conv(
+yolo_dev1  |     (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (18): Concat()
+yolo_dev1  |   (19): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): Bottleneck(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(32, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (20): Conv(
+yolo_dev1  |     (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+yolo_dev1  |     (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |     (act): SiLU(inplace=True)
+yolo_dev1  |   )
+yolo_dev1  |   (21): Concat()
+yolo_dev1  |   (22): C3k2(
+yolo_dev1  |     (cv1): Conv(
+yolo_dev1  |       (conv): Conv2d(384, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (cv2): Conv(
+yolo_dev1  |       (conv): Conv2d(384, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |       (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |       (act): SiLU(inplace=True)
+yolo_dev1  |     )
+yolo_dev1  |     (m): ModuleList(
+yolo_dev1  |       (0): C3k(
+yolo_dev1  |         (cv1): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv2): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (cv3): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (m): Sequential(
+yolo_dev1  |           (0): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |           (1): Bottleneck(
+yolo_dev1  |             (cv1): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |             (cv2): Conv(
+yolo_dev1  |               (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |               (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |               (act): SiLU(inplace=True)
+yolo_dev1  |             )
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  |   (23): Detect(
+yolo_dev1  |     (cv2): ModuleList(
+yolo_dev1  |       (0): Sequential(
+yolo_dev1  |         (0): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |       (1): Sequential(
+yolo_dev1  |         (0): Conv(
+yolo_dev1  |           (conv): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |       (2): Sequential(
+yolo_dev1  |         (0): Conv(
+yolo_dev1  |           (conv): Conv2d(256, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (1): Conv(
+yolo_dev1  |           (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+yolo_dev1  |           (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |           (act): SiLU(inplace=True)
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |     (cv3): ModuleList(
+yolo_dev1  |       (0): Sequential(
+yolo_dev1  |         (0): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(64, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(64, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (1): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=80, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |       (1): Sequential(
+yolo_dev1  |         (0): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(128, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(128, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (1): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=80, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |       (2): Sequential(
+yolo_dev1  |         (0): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(256, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(256, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (1): Sequential(
+yolo_dev1  |           (0): DWConv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=80, bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |           (1): Conv(
+yolo_dev1  |             (conv): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |             (bn): BatchNorm2d(80, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+yolo_dev1  |             (act): SiLU(inplace=True)
+yolo_dev1  |           )
+yolo_dev1  |         )
+yolo_dev1  |         (2): Conv2d(80, 80, kernel_size=(1, 1), stride=(1, 1))
+yolo_dev1  |       )
+yolo_dev1  |     )
+yolo_dev1  |     (dfl): DFL(
+yolo_dev1  |       (conv): Conv2d(16, 1, kernel_size=(1, 1), stride=(1, 1), bias=False)
+yolo_dev1  |     )
+yolo_dev1  |   )
+yolo_dev1  | )
