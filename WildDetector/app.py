@@ -3,30 +3,30 @@ import cv2
 import json
 import time
 import torch
-import torch.nn as nn
 import datetime
 import threading
 import numpy as np
-from torchvision import transforms
-import torchvision
 from ultralytics import YOLO
-from ultralytics.engine.results import Results
+from torchvision import transforms
 from collections import defaultdict
+from ultralytics.engine.results import Results
 from flask import Flask, request, jsonify, Response, redirect # type: ignore
 
 app = Flask(__name__)
 
 # Status variables
+RUNNING_VIDEO = os.getenv('RUNNING_FLAG', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 RUNNING_PORT = int(os.getenv('RUNNING_PORT', 5000))     # Default to 5000 if not set
-STATUS = 'get_raw'                                         # Default camera
+STATUS = 'idle'                                         # Default camera
 SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
-SOURCE_DATA = '/dev/video0'                                    # Customize for the inference source
+SOURCE_DATA = 'none'                                    # Customize for the inference source
 MODEL_FOLDER = 'models/'
 MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
 HEAD = MODEL.model.model[2]                             # Head part of the model
 # For adhering to Flask's best practices
+app.config['RUNNING_VIDEO'] = RUNNING_VIDEO
 app.config['RUNNING_PORT'] = RUNNING_PORT
 app.config['STATUS'] = STATUS
 app.config['SOURCE_CAMERA'] = SOURCE_CAMERA
@@ -53,8 +53,8 @@ def generate_raw():
     current_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
     current_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     current_fps = cap.get(cv2.CAP_PROP_FPS)
-    print(f"Resolution: {current_width}x{current_height}")
-    print(f"Frame Rate: {current_fps}")
+    print(f"Camera Resolution: {current_width}x{current_height}")
+    print(f"Camera Frame Rate: {current_fps}")
 
     # Initialize FPS calculation
     fps = 0
@@ -128,8 +128,7 @@ def generate_inf():
             break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
         results = MODEL.predict(source=frame)
-        print(results)
-        break
+
         frame_count += 1                                        # Update the frame count
         if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
             elapsed_time = time.perf_counter() - start_time
@@ -159,12 +158,18 @@ def generate_inf():
             'names': extracted_res['names']
         }
 
-        # Convert the result data dictionary to JSON string
-        result_json = json.dumps(rewritten_res)
-
-        # Yield the JSON-encoded results
+        # Encode the frame as JPEG
+        _, buffer = cv2.imencode('.jpg', results[0].plot())
+        frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
-               b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        # # Convert the result data dictionary to JSON string
+        # result_json = json.dumps(rewritten_res)
+
+        # # Yield the JSON-encoded results
+        # yield (b'--frame\r\n'
+        #        b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
         
     cap.release()
 
@@ -175,6 +180,30 @@ def generate_inf():
 ### with torch.no_grad():
 ### cis a ontext manager in PyTorch that disables gradient computation, which is useful during inference or evaluation.
 ### When used can save memory and computational resources, during model evaluation or inference you don’t need gradients since you’re not updating any parameters.
+
+### print(MODEL.model)  or look at https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml for layer structure
+### as HEAD output, referred as 'detectHead', we can find:
+### detectHead[0]: Primary predictions (e.g., processed for object detection).
+### detectHead[1]: Feature maps used for further calculations or analysis (e.g., visualization, debugging, additional model layers).
+### Can examine better the content with:
+###  if isinstance(b23, (list, tuple)):
+###      for i, tensor in enumerate(b23):
+###          print(f"Type of element {i} in b23: {type(tensor)}")
+###          if isinstance(tensor, torch.Tensor):
+###              print(f"Shape of tensor {i} in b23: {tensor.shape}")
+###          elif isinstance(tensor, list):
+###              print(f"Element {i} in b23 is a list with length: {len(tensor)}")
+###          else:
+###              print(f"Unexpected type for element {i}: {type(tensor)}")
+###  else:
+###      print("Unexpected output type for b23:", type(b23))
+###  if isinstance(b23, (list, tuple)):
+###      for i, item in enumerate(b23):
+###          if isinstance(item, list):
+###              for j, sub_item in enumerate(item):
+###                  print(f"Type of sub-item {j} in list at b23[{i}]: {type(sub_item)}")
+###                  if isinstance(sub_item, torch.Tensor):
+###                      print(f"Shape of sub-item {j}: {sub_item.shape}")
 
 def consume_raw():
     cap = cv2.VideoCapture(SOURCE_DATA)
@@ -189,191 +218,15 @@ def consume_raw():
             print("Error: Unable to read frame from the video feed.")
             break   # Using 'continue' allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
-        # Resize frame to the desired input size
-        frame_resized = cv2.resize(frame, (640, 640))
-        
-        # Convert to RGB (YOLO typically expects RGB)
-        frame_rgb = frame_resized[..., ::-1]  # BGR to RGB
-        
-        # Normalize the image (YOLO uses values in range [0, 1])
-        frame_normalized = frame_rgb / 255.0
-        
-        # Convert to Tensor and add batch dimension
-        transform = transforms.ToTensor()
-        frame_tensor = transform(frame_normalized).unsqueeze(0)  # Add batch dimension
-
-        print(frame_tensor.shape)
         # Pre-process the frame to match YOLO input size
-        input_tensor = cv2.resize(frame, (640, 640))
-        input_tensor = input_tensor[..., ::-1]                            # Convert BGR to RGB
-        input_tensor = np.copy(input_tensor)                              # Create a copy of the array to avoid negative strides
-        input_tensor = np.transpose(input_tensor, (2, 0, 1))              # Change to (C, H, W)
-        input_tensor = np.expand_dims(input_tensor, axis=0)               # Add batch dimension
-        input_tensor = torch.from_numpy(input_tensor).float() / 255.0     # Normalize to [0, 1]
-        print(input_tensor.shape)
-        print("QUI")
-        print(frame_tensor)
-        print("QUI")
-        print(input_tensor)
-        print("QUI")
+        frame_resized = cv2.resize(frame, (640, 640))               # Resize frame to the desired input size
+        frame_rgb = frame_resized[..., ::-1]                        # Convert BGR to RGB (YOLO typically expects RGB)
+        frame_normalized = frame_rgb / 255.0                        # Normalize the image (YOLO uses values in range [0, 1])
+        transform = transforms.ToTensor()                           # Convert to Tensor and add batch dimension
+        frame_tensor = transform(frame_normalized).unsqueeze(0)     # Add batch dimension
+        frame_tensor = frame_tensor.to(torch.float32)               # Convert to float32 as the first layer require
 
-        frame_tensor = frame_tensor.to(torch.double)  # Convert to torch.Double
-
-        # print(MODEL.model)  # https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml
-        # Pass through the backbone
-        print(input_tensor.shape)
-        b0 = MODEL.model.model[0](input_tensor)
-        print(f"{b0.shape}-0")
-        b1 = MODEL.model.model[1](b0)
-        print(f"{b1.shape}-1")
-        b2 = MODEL.model.model[2](b1)
-        print(f"{b2.shape}-2")
-        b3 = MODEL.model.model[3](b2)
-        print(f"{b3.shape}-3")
-        b4 = MODEL.model.model[4](b3)
-        print(f"{b4.shape}-4")
-        b5 = MODEL.model.model[5](b4)
-        print(f"{b5.shape}-5")
-        b6 = MODEL.model.model[6](b5)
-        print(f"{b6.shape}-6")
-        b7 = MODEL.model.model[7](b6)
-        print(f"{b7.shape}-7")
-        b8 = MODEL.model.model[8](b7)
-        print(f"{b8.shape}-8")
-        b9 = MODEL.model.model[9](b8)
-        print(f"{b9.shape}-9")
-        b10 = MODEL.model.model[10](b9)
-        print(f"{b10.shape}-10")
-        b11 = MODEL.model.model[11](b10)
-        print(f"{b11.shape}-11")
-        b12 = MODEL.model.model[12]([b11,b6])
-        print(f"{b12.shape}-12")
-        b13 = MODEL.model.model[13](b12)
-        print(f"{b13.shape}-13")
-        b14 = MODEL.model.model[14](b13)
-        print(f"{b14.shape}-14")
-        b15 = MODEL.model.model[15]([b14,b4])
-        print(f"{b15.shape}-15")
-        b16 = MODEL.model.model[16](b15)
-        print(f"{b16.shape}-16")
-        b17 = MODEL.model.model[17](b16)
-        print(f"{b17.shape}-17")
-        b18 = MODEL.model.model[18]([b17,b13])
-        print(f"{b18.shape}-18")
-        b19 = MODEL.model.model[19](b18)
-        print(f"{b19.shape}-19")
-        b20 = MODEL.model.model[20](b19)
-        print(f"{b20.shape}-20")
-        b21 = MODEL.model.model[21]([b20,b10])
-        print(f"{b21.shape}-21")
-        b22 = MODEL.model.model[22](b21)
-        print(f"{b22.shape}-22")
-        b23 = MODEL.model.model[23]([b16,b19,b22])
-        # b23[0]: Primary predictions (e.g., processed for object detection).
-        # b23[1]: Feature maps used for further calculations or analysis (e.g., visualization, debugging, additional model layers).
-        if isinstance(b23, (list, tuple)):
-            for i, tensor in enumerate(b23):
-                print(f"Type of element {i} in b23: {type(tensor)}")
-                if isinstance(tensor, torch.Tensor):
-                    print(f"Shape of tensor {i} in b23: {tensor.shape}")
-                elif isinstance(tensor, list):
-                    print(f"Element {i} in b23 is a list with length: {len(tensor)}")
-                else:
-                    print(f"Unexpected type for element {i}: {type(tensor)}")
-        else:
-            print("Unexpected output type for b23:", type(b23))
-
-        if isinstance(b23, (list, tuple)):
-            for i, item in enumerate(b23):
-                if isinstance(item, list):
-                    for j, sub_item in enumerate(item):
-                        print(f"Type of sub-item {j} in list at b23[{i}]: {type(sub_item)}")
-                        if isinstance(sub_item, torch.Tensor):
-                            print(f"Shape of sub-item {j}: {sub_item.shape}")
-
-
-        ###### postprocess
-        # Assuming `model` is the YOLO model and `b23[0]` contains predictions
-        predictions = b23[0]  # Raw output tensor of shape [batch_size, num_classes + 5, num_detections]
-
-        # # Post-process predictions
-        # boxes = []
-        # for pred in predictions[0]:  # Assuming batch size is 1
-        #     x_center, y_center, w, h = pred[:4]  # Box coordinates
-        #     score = pred[4]  # Objectness score
-        #     class_scores = pred[5:]  # Class scores
-        #     class_id = torch.argmax(class_scores)
-        #     final_score = score * class_scores[class_id]
-            
-        #     # Convert to [x1, y1, x2, y2] format
-        #     x1 = x_center - w / 2
-        #     y1 = y_center - h / 2
-        #     x2 = x_center + w / 2
-        #     y2 = y_center + h / 2
-
-        #     print([x1, y1, x2, y2, final_score, class_id])
-        #     # Append as [x1, y1, x2, y2, conf, cls]
-        #     boxes.append([x1, y1, x2, y2, final_score, class_id])
-
-        # # Convert to tensor
-        # boxes_tensor = torch.tensor(boxes)  # Shape: [num_detections, 6]
-
-        # class_ids = boxes_tensor[:, -1].unique().tolist()  # Extract unique class IDs
-        
-        # print("Unique class IDs in predictions:", class_ids)
-        # print("Class IDs in predictions:", boxes_tensor)
-
-        boxes, confidences, class_probs = predictions[:, :4], predictions[:, 4], predictions[:, 5:]
-
-        # Flatten boxes and scores to handle the batch dimension properly
-        boxes = boxes.reshape(-1, 4)  # Flatten the boxes to shape [num_predictions, 4]
-        confidences = confidences.flatten()  # Flatten the scores to shape [num_predictions]
-        class_probs = class_probs.flatten()  # Flatten the classes to shape [num_predictions]
-
-        # Filter predictions by confidence threshold
-        mask = confidences > 0.5
-        boxes, confidences, class_probs = boxes[mask], confidences[mask], class_probs[mask]
-        
-        # Compute class probabilities and class IDs
-        class_ids = torch.argmax(class_probs, dim=1)
-        scores = confidences * torch.max(class_probs, dim=1).values
-
-        # # Apply Non-Maximum Suppression (NMS)
-        # keep_indices = nms(boxes, scores, IOU_THRESH)
-        # boxes, class_ids, scores = boxes[keep_indices], class_ids[keep_indices], scores[keep_indices]
-
-        # print(MODEL.names)
-        my_dict = {i: str(i) for i in range(10001)}
-        results = Results(path=None, orig_img=frame,boxes=boxes, names=my_dict)
-
-        # # Pass through neck (if applicable)
-        # neck_out = MODEL.model.model[10:20](b6)  # Neck layers
-        # # Pass through head (prediction layers)
-        # head_out = MODEL.model.model[20:](neck_out)  # Head layers
-
-        # head_out = head_out[head_out[..., 4] > 0.5]
-        # boxes = head_out[..., :4]
-        # scores = head_out[..., 4] * head_out[..., 5]  # Objectness * class score
-        # class_ids = head_out[..., 5].argmax(dim=-1)
-        # keep = torchvision.ops.nms(boxes, scores, 0.45)
-        # final_boxes = boxes[keep]
-        # final_scores = scores[keep]
-        # final_class_ids = class_ids[keep]
-
-        # print(final_boxes.shape)
-        # print(final_scores.shape)
-        # print(final_class_ids.shape)
-
-        # backbone_layers = MODEL.model.model[:10]  # Layers 0 to 9 for the backbone
-        # neck_layers = MODEL.model.model[10:20]   # Layers 10 to 19 for the neck
-        # head_layers = MODEL.model.model[20:]     # Layers 20 onwards for the head
-
-        # backbone_out = backbone_layers(input_tensor)
-        # neck_out = neck_layers(backbone_out)
-        # results = head_layers(neck_out)
-
-
-        # # Pre-process the frame to match YOLO input size
+        # Can also use this to pre-process
         # input_tensor = cv2.resize(frame, (640, 640))
         # input_tensor = input_tensor[..., ::-1]                            # Convert BGR to RGB
         # input_tensor = np.copy(input_tensor)                              # Create a copy of the array to avoid negative strides
@@ -381,163 +234,68 @@ def consume_raw():
         # input_tensor = np.expand_dims(input_tensor, axis=0)               # Add batch dimension
         # input_tensor = torch.from_numpy(input_tensor).float() / 255.0     # Normalize to [0, 1]
 
-        # # Stage 1: Backbone (feature extraction)
-        # with torch.no_grad():
-        #     features = BACKBONE(input_tensor)           # Get the feature maps from the Backbone
+        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
+        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
+        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
+        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
+        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
+        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
+        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
+        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
+        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
+        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
 
-        # # Stage 2: Neck (Feature Refinement)
-        # with torch.no_grad():
-        #     refined_features = NECK(features)
+        # Stage 2: Neck (Feature Refinement)
+        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
+        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
+        b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
+        b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
+        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
+        b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
+        b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
+        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
+        b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
+        b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
+        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
+        b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
+        b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
+        b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
 
-        # # Stage 3: Head (Final Predictions)
-        # with torch.no_grad():
-        #     predictions = HEAD(refined_features)        # Output tensors from the YOLO models seem to be feature maps of shape [1, C, H, W]
+        # Stage 3: Head (Final Predictions)
+        b23 = MODEL.model.model[23]([b16,b19,b22])
 
-        # # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
-        # #-----------------------------------------------------------------------------------------------------#
+        # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
+        # TODO
 
-        # def debug_forward(model, x):
-        #     y, dt = [], []  # outputs
-        #     for _ in range(len(model.model)):  # Initialize outputs for all layers
-        #         y.append(None)
+        # predictions = b23[0]
+        # boxes = []
+        # for pred in predictions[0]:  # Assuming batch size is 1
+        #     x_center, y_center, w, h = pred[:4]  # Box coordinates
+        #     score = pred[4]  # Objectness score
+        #     class_scores = pred[5:]  # Class scores
+        #     class_id = torch.argmax(class_scores)
+        #     final_score = score * class_scores[class_id]
+        #     # Convert to [x1, y1, x2, y2] format
+        #     x1 = x_center - w / 2
+        #     y1 = y_center - h / 2
+        #     x2 = x_center + w / 2
+        #     y2 = y_center + h / 2
+        #     print([x1, y1, x2, y2, final_score, class_id])
+        #     # Append as [x1, y1, x2, y2, conf, cls]
+        #     boxes.append([x1, y1, x2, y2, final_score, class_id])
+        # # Convert to tensor
+        # boxes_tensor = torch.tensor(boxes)  # Shape: [num_detections, 6]
+        # # print(MODEL.names)
+        # my_dict = {i: str(i) for i in range(10001)}
+        # results = Results(path=None, orig_img=frame, boxes=boxes_tensor, names=my_dict)
+        # frame = results[0].plot()
 
-        #     for i, m in enumerate(model.model):
-        #         print(f"Processing layer {i}: {m}")
+        # Convert the result data to JSON string
+        result_json = json.dumps(b23[0].tolist())
 
-        #         if m.f != -1:  # If the layer has dependencies
-        #             x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]
-        #             print(f"Layer {i} inputs: {m.f}, shapes: "
-        #                 f"{[y[j].shape if y[j] is not None else 'None' for j in m.f]}")
-
-        #         y[i] = m(x)
-        #         print(f"Layer {i} output shape: {y[i].shape if y[i] is not None else 'None'}")
-
-        #     return y
-        
-        # debug_forward(MODEL.model, input_tensor)
-
-
-        # # print(MODEL)
-        # # print(MODEL.model)
-        # # print(MODEL.model.model)
-        # print(MODEL.model[0])
-        # # print(MODEL.model.model[1])
-        # # print(MODEL.model.model[2])
-        # # print(MODEL.model.model[3])
-        # print("poi")
-
-        # print(features.shape)
-        # print(refined_features.shape)
-        # print(predictions.shape)
-        # print(predictions[0].shape)
-        # break
-
-        # # # Parse predictions (YOLO format: [x, y, w, h, conf, class1, class2, ...])
-        # # predictions = predictions[0]  # Batch size is 1; take the first (and only) batch
-        # # boxes, confidences, class_probs = predictions[:, :4], predictions[:, 4], predictions[:, 5:]
-
-        # # # Flatten boxes and scores to handle the batch dimension properly
-        # # boxes = boxes.reshape(-1, 4)  # Flatten the boxes to shape [num_predictions, 4]
-        # # confidences = confidences.flatten()  # Flatten the scores to shape [num_predictions]
-        # # class_probs = class_probs.flatten()  # Flatten the classes to shape [num_predictions]
-
-        # # # Filter predictions by confidence threshold
-        # # mask = confidences > 0.5
-        # # boxes, confidences, class_probs = boxes[mask], confidences[mask], class_probs[mask]
-        
-        # # # Compute class probabilities and class IDs
-        # # class_ids = torch.argmax(class_probs, dim=1)
-        # # scores = confidences * torch.max(class_probs, dim=1).values
-
-        # # # Apply Non-Maximum Suppression (NMS)
-        # # keep_indices = nms(boxes, scores, IOU_THRESH)
-        # # boxes, class_ids, scores = boxes[keep_indices], class_ids[keep_indices], scores[keep_indices]
-
-        # # # Draw results on the frame
-        # # for box, class_id, score in zip(boxes, class_ids, scores):
-        # #     x, y, w, h = box
-        # #     x1, y1, x2, y2 = int(x - w / 2), int(y - h / 2), int(x + w / 2), int(y + h / 2)
-        # #     label = f"{CLASS_NAMES[class_id]}: {score:.2f}"
-        # #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        # #     cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-  
-  
-        # # # Apply sigmoid to object confidence and class probabilities
-        # # predictions[..., 4:] = torch.sigmoid(predictions[..., 4:])  # objectness and class scores
-        
-        # # # Get class probabilities and objectness score
-        # # object_confidence = predictions[..., 4]  # Objectness score for each cell
-        # # class_probs = predictions[..., 5:]  # Class probabilities
-        
-        # # # Apply threshold to object confidence
-        # # object_confidence_mask = object_confidence > 0.5  # Apply confidence threshold
-        # # predictions = predictions[object_confidence_mask]
-        
-        # # # Extract class labels
-        # # class_preds = torch.argmax(class_probs, dim=-1)  # Get the predicted class for each detected object
-        # # labels = class_preds.tolist()  # Convert to list for easier use
-        
-        # # print(labels)
-
-
-
-        # # results = MODEL.postprocess(predictions[0])     # Apply Non-Maximum Suppression (NMS) and other filters
-        
-        # # Extract the bounding boxes, scores, and class labels
-        # boxes = predictions[0][:, :4]  # Bounding boxes (x1, y1, x2, y2)
-        # scores = predictions[0][:, 4]  # Confidence scores
-        # classes = predictions[0][:, 5]  # Class IDs
-        # print("Shape of boxes:", boxes.shape)
-        # print("Shape of scores:", scores.shape)
-        # print("Shape of classes:", classes.shape)
-
-        # # Flatten boxes and scores to handle the batch dimension properly
-        # boxes = boxes.reshape(-1, 4)  # Flatten the boxes to shape [num_predictions, 4]
-        # scores = scores.flatten()  # Flatten the scores to shape [num_predictions]
-        # classes = classes.flatten()  # Flatten the classes to shape [num_predictions]
-
-        # # Apply a confidence threshold (optional, e.g., keep detections with confidence > 0.5)
-        # confidence_threshold = 0.5
-        # mask = scores > confidence_threshold
-
-        # # Filter predictions based on the confidence threshold
-        # filtered_boxes = boxes[mask]
-        # filtered_scores = scores[mask]
-        # filtered_classes = classes[mask]
-
-        # # mask = confidences > 0.5
-        # # boxes, confidences, class_probs = boxes[mask], confidences[mask], class_probs[mask]
-        # print("Shape of filtered_classes:", filtered_classes.shape)
-
-        # # class_ids = torch.argmax(filtered_classes, dim=1)
-        # # scores = filtered_scores * torch.max(filtered_classes, dim=1).values
-
-        # # # Apply Non-Maximum Suppression (NMS)
-        # # keep_indices = nms(boxes, scores, IOU_THRESH)
-        # # boxes, class_ids, scores = boxes[keep_indices], class_ids[keep_indices], scores[keep_indices]
-
-        # # # Draw results on the frame
-        # # for box, class_id, score in zip(boxes, class_ids, scores):
-        # #     x, y, w, h = box
-        # #     x1, y1, x2, y2 = int(x - w / 2), int(y - h / 2), int(x + w / 2), int(y + h / 2)
-        # #     label = f"{CLASS_NAMES[class_id]}: {score:.2f}"
-        # #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        # #     cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        # # Create the results object, which usually works in this format:
-        # # (boxes, scores, classes, frame) in the expected format
-        # results = [YOLO.Results(frame, boxes=filtered_boxes, scores=filtered_scores, classes=filtered_classes)]
-
-        # results = MODEL.predict(source=frame)
-        # print(type(results[0]))
-        # print(results[0].shape)
-        frame = results[0].plot()   # used to overlay the results (such as bounding boxes, class labels, or other annotations) onto the image
-
-        # Encode the frame as JPEG
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
+        # Yield the JSON-encoded results
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+               b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
 
     cap.release()
 
