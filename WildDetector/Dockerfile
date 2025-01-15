@@ -1,6 +1,6 @@
 FROM ultralytics/ultralytics:latest-jetson-jetpack6
 
-RUN pip install --no-cache-dir flask
+RUN pip install --no-cache-dir flask pika
 
 COPY . /usr/src/ultralytics
 

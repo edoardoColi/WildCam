@@ -4,6 +4,8 @@ services:
     container_name: yolo_dev1
     environment:
       - RUNNING_PORT=5000
+      - RUNNING_VIDEO=f
+      - STATS_PRINT=f
     privileged: true
     volumes:
       - ./models/:/usr/src/ultralytics/models/
@@ -13,16 +15,18 @@ services:
     runtime: nvidia       # Enables GPU-accelerated workloads, without this runtime the container cannot utilize GPU hardware
     network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access
 
-  # yolo_service2:
-  #   build: ./WildDetector     # Use the Dockerfile in the specified directory
-  #   container_name: yolo_dev2
-  #   environment:
-  #     - RUNNING_PORT=5010
-  #   privileged: true
-  #   volumes:
-  #     - ./models/:/usr/src/ultralytics/models/
-  #     - /tmp/.X11-unix:/tmp/.X11-unix
-  #     - /dev:/dev
-  #     - /etc/localtime:/etc/localtime:ro
-  #   runtime: nvidia       # Enables GPU-accelerated workloads, without this runtime the container cannot utilize GPU hardware
-  #   network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access
+  yolo_service2:
+    build: ./WildDetector     # Use the Dockerfile in the specified directory
+    container_name: yolo_dev2
+    environment:
+      - RUNNING_PORT=5010
+      - RUNNING_VIDEO=True
+      - STATS_PRINT=True
+    privileged: true
+    volumes:
+      - ./models/:/usr/src/ultralytics/models/
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev:/dev
+      - /etc/localtime:/etc/localtime:ro
+    runtime: nvidia       # Enables GPU-accelerated workloads, without this runtime the container cannot utilize GPU hardware
+    network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access

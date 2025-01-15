@@ -2,7 +2,12 @@ import os
 import cv2
 import json
 import time
+import pika
 import torch
+import pickle
+import socket
+import struct
+import requests
 import datetime
 import threading
 import numpy as np
@@ -15,13 +20,15 @@ from flask import Flask, request, jsonify, Response, redirect # type: ignore
 app = Flask(__name__)
 
 # Status variables
-RUNNING_VIDEO = os.getenv('RUNNING_FLAG', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+STATS_PRINT = os.getenv('STATS_PRINT', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+RUNNING_VIDEO = os.getenv('RUNNING_VIDEO', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 RUNNING_PORT = int(os.getenv('RUNNING_PORT', 5000))     # Default to 5000 if not set
 STATUS = 'idle'                                         # Default camera
 SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
 SOURCE_DATA = 'none'                                    # Customize for the inference source
 MODEL_FOLDER = 'models/'
 MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)
+MODEL = MODEL.to('cuda')
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
 HEAD = MODEL.model.model[2]                             # Head part of the model
@@ -35,6 +42,7 @@ app.config['MODEL_FOLDER'] = MODEL_FOLDER
 # Ensure directories exist
 os.makedirs(MODEL_FOLDER, exist_ok=True)
 
+tensor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 ###
 #   OPERATIVE PARTS (as capable device)
 ###
@@ -58,34 +66,55 @@ def generate_raw():
 
     # Initialize FPS calculation
     fps = 0
+    bps = 0
     frame_count = 0
-    start_time = time.perf_counter()
+    bytes_count = 0
+    start_fps_time = time.perf_counter()
+    start_bps_time = time.perf_counter()
     while STATUS == "send_raw":
         ret, frame = cap.read()
         if not ret:
             print("Error: Unable to read frame from the video feed.")
             break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
-        frame_count += 1                                        # Update the frame count
-        if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
-            elapsed_time = time.perf_counter() - start_time
-            if elapsed_time > 0:
-                fps = frame_count / elapsed_time
-            frame_count = 0                                     # Restart the counter
-            start_time = time.perf_counter()                    # Restart the times
+        if(STATS_PRINT):
+            frame_count += 1                                        # Update the frame count
+            if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
+                elapsed_time1 = time.perf_counter() - start_fps_time
+                if elapsed_time1 > 0:
+                    fps = frame_count / elapsed_time1
+                    frame_count = 0                                     # Restart the counter
+                    start_fps_time = time.perf_counter()                    # Restart the times
 
         # Overlay FPS, image size, and camera FPS on the frame
-        cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
-        cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-        cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-        cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
-            (frame.shape[1] - cv2.getTextSize(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0][0] - 10, 
-             frame.shape[0] - 10), 
-            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 165, 255), 2)
+        if(RUNNING_VIDEO):
+            cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
+            cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            if(STATS_PRINT):
+                cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                (frame.shape[1] - cv2.getTextSize(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0][0] - 10, 
+                frame.shape[0] - 10), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 165, 255), 2)
 
         # Encode the frame as JPEG
+        print(len(frame.tobytes()))
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
+        print(len(frame_bytes))
+        if(STATS_PRINT):
+            bytes_sent = len(frame_bytes)
+            bytes_count += bytes_sent                             # Update the bytes count
+            elapsed_time2 = time.perf_counter() - start_bps_time
+            if elapsed_time2 > 2:
+                bps = bytes_count / elapsed_time2
+                bytes_count = 0                                             # Restart the counter
+                start_bps_time = time.perf_counter()                        # Restart the times
+
+            print(f"Bytes of the frame: {bytes_sent}")
+            print(f"Frame per Seconds:  {fps}")
+            print(f"Bytes per Seconds:  {bps}")
+
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
@@ -98,8 +127,136 @@ def generate_neck():
     return
     
 def generate_head():
-    return
-    
+    device_ip = '10.200.3.28'
+    print(f"Head stream prepering on {device_ip}:5111")
+    tensor_socket.bind((device_ip, 5111))
+    tensor_socket.listen(1)
+    print("Head stream is ready")
+    conn, addr = tensor_socket.accept()
+    cap = cv2.VideoCapture(SOURCE_CAMERA)
+
+
+    if not cap.isOpened():
+        print(f"Error: Unable to access the video feed from '{SOURCE_DATA}'. Is the stream active elsewhere?")
+        return
+
+    # Initialize FPS calculation
+    fps = 0
+    bps = 0
+    frame_count = 0
+    bytes_count = 0
+    start_fps_time = time.perf_counter()
+    start_bps_time = time.perf_counter()
+
+    tensor_created = False
+    tensor = None
+    while STATUS in ["send_head"]:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Unable to read frame from the video feed.")
+            break   # Using 'continue' allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
+
+        if(STATS_PRINT):
+            frame_count += 1                                        # Update the frame count
+            if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
+                elapsed_time1 = time.perf_counter() - start_fps_time
+                if elapsed_time1 > 0:
+                    fps = frame_count / elapsed_time1
+                    frame_count = 0                                     # Restart the counter
+                    start_fps_time = time.perf_counter()                    # Restart the times
+
+        # Pre-process the frame to match YOLO input size
+        frame_resized = cv2.resize(frame, (640, 640))               # Resize frame to the desired input size
+        frame_rgb = frame_resized[..., ::-1]                        # Convert BGR to RGB (YOLO typically expects RGB)
+        frame_normalized = frame_rgb / 255.0                        # Normalize the image (YOLO uses values in range [0, 1])
+        transform = transforms.ToTensor()                           # Convert to Tensor and add batch dimension
+        frame_tensor = transform(frame_normalized).unsqueeze(0)     # Add batch dimension
+        frame_tensor = frame_tensor.to(torch.float32)               # Convert to float32 as the first layer require
+
+        # Can also use this to pre-process
+        # input_tensor = cv2.resize(frame, (640, 640))
+        # input_tensor = input_tensor[..., ::-1]                            # Convert BGR to RGB
+        # input_tensor = np.copy(input_tensor)                              # Create a copy of the array to avoid negative strides
+        # input_tensor = np.transpose(input_tensor, (2, 0, 1))              # Change to (C, H, W)
+        # input_tensor = np.expand_dims(input_tensor, axis=0)               # Add batch dimension
+        # input_tensor = torch.from_numpy(input_tensor).float() / 255.0     # Normalize to [0, 1]
+
+        # MODEL = MODEL.to('cuda')                    # Move the model to GPU
+        frame_tensor = frame_tensor.to('cuda')      # Ensure the input tensor is on the same device as the model
+
+        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
+        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
+        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
+        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
+        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
+        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
+        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
+        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
+        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
+        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
+
+        # Stage 2: Neck (Feature Refinement)
+        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
+        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
+        b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
+        b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
+        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
+        b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
+        b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
+        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
+        b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
+        b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
+        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
+        b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
+        b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
+        b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
+        if not tensor_created:
+            tensor = b15
+            tensor_created = True
+        print(type(tensor))
+        print(tensor.shape)
+
+        # Stage 3: Head (Final Predictions)
+        slice = MODEL.model.model[23]([b16,b19,b22])
+        # slice = torch.tensor([2025, 1, 1], dtype=torch.int32)
+        # print(len(slice[0])) # tensor(2025, dtype=torch.int32)
+        # print(len(slice[1])) # tensor(2025, dtype=torch.int32)
+        # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
+        # TODO
+
+        # Convert the result data
+        my_list = [1, 2, 3, 4, 5]
+
+        serialized_tensor = pickle.dumps(my_list)
+        # Split the data into chunks for big datas
+        chunk_size = 1024  # Size of each chunk (in bytes)
+        data_length = len(serialized_tensor)
+
+        if(STATS_PRINT):
+            bytes_sent = len(serialized_tensor)
+            bytes_count += bytes_sent                             # Update the bytes count
+            elapsed_time2 = time.perf_counter() - start_bps_time
+            if elapsed_time2 > 2:
+                bps = bytes_count / elapsed_time2
+                bytes_count = 0                                             # Restart the counter
+                start_bps_time = time.perf_counter()                        # Restart the times
+
+            print(f"Bytes of the frame: {bytes_sent}")
+            print(f"Frame per Seconds:  {fps}")
+            print(f"Bytes per Seconds:  {bps}")
+
+        # Send the tensor
+        conn.sendall(struct.pack('!I', data_length))
+        for i in range(0, data_length, chunk_size):
+            chunk = serialized_tensor[i:i+chunk_size]
+            conn.sendall(chunk)
+            # print(f"Sent chunk {i//chunk_size + 1}/{(data_length // chunk_size) + 1}")
+
+    cap.release()
+    conn.close()
+    tensor_socket.close()
+    print("Head stream is terminated")
+
 def generate_inf():
     cap = cv2.VideoCapture(SOURCE_CAMERA)
 
@@ -119,8 +276,11 @@ def generate_inf():
 
     # Initialize FPS calculation
     fps = 0
+    bps = 0
     frame_count = 0
+    bytes_count = 0
     start_time = time.perf_counter()
+    start_bps_time = time.perf_counter()
     while STATUS == "send_inf":
         ret, frame = cap.read()
         if not ret:
@@ -145,6 +305,7 @@ def generate_inf():
             'names': results[0].names,
             # 'path': results[0].path,
         }
+        yoloFps = 1000/results[0].speed['inference']
         box_groups = defaultdict(list)                  # Dictionary of boxes grouped by class ID
         for box in extracted_res['boxes']:
             class_id = box[5]                           # The 6th value represents the class ID
@@ -153,23 +314,48 @@ def generate_inf():
             'inference_time': extracted_res['inference_time'],
             'box_count': {extracted_res['names'][class_id]: len(boxes) for class_id, boxes in box_groups.items()},
             'boxes': box_groups,
-            'yolo_fps': 1000/results[0].speed['inference'],
+            'yolo_fps': yoloFps,
             'fps': fps,
             'names': extracted_res['names']
         }
 
-        # Encode the frame as JPEG
-        _, buffer = cv2.imencode('.jpg', results[0].plot())
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        # Overlay FPS, image size, and camera FPS on the frame
+        if(RUNNING_VIDEO):
+            cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
+            cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            if(STATS_PRINT):
+                cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                cv2.putText(frame, f"Yolo FPS: {yoloFps:.2f}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                (frame.shape[1] - cv2.getTextSize(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0][0] - 10, 
+                frame.shape[0] - 10), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 165, 255), 2)
 
-        # # Convert the result data dictionary to JSON string
-        # result_json = json.dumps(rewritten_res)
+            # Encode the frame as JPEG
+            _, buffer = cv2.imencode('.jpg', results[0].plot())
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        else:
+            # Convert the result data dictionary to JSON string
+            result_json = json.dumps(rewritten_res)
 
-        # # Yield the JSON-encoded results
-        # yield (b'--frame\r\n'
-        #        b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
+            if(STATS_PRINT):
+                bytes_sent = len(result_json)
+                bytes_count += bytes_sent                             # Update the bytes count
+                elapsed_time2 = time.perf_counter() - start_bps_time
+                if elapsed_time2 > 2:
+                    bps = bytes_count / elapsed_time2
+                    bytes_count = 0                                             # Restart the counter
+                    start_bps_time = time.perf_counter()                        # Restart the times
+
+                print(f"Bytes of the frame: {bytes_sent}")
+                print(f"Frame per Seconds:  {fps}")
+                print(f"Bytes per Seconds:  {bps}")
+
+            # Yield the JSON-encoded results
+            yield (b'--frame\r\n'
+                b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
         
     cap.release()
 
@@ -178,7 +364,7 @@ def generate_inf():
 ###
 
 ### with torch.no_grad():
-### cis a ontext manager in PyTorch that disables gradient computation, which is useful during inference or evaluation.
+### is a context manager in PyTorch that disables gradient computation, which is useful during inference or evaluation.
 ### When used can save memory and computational resources, during model evaluation or inference you don’t need gradients since you’re not updating any parameters.
 
 ### print(MODEL.model)  or look at https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml for layer structure
@@ -209,94 +395,99 @@ def consume_raw():
     cap = cv2.VideoCapture(SOURCE_DATA)
 
     if not cap.isOpened():
-        print(f"Error: Unable to access the video feed from '{SOURCE_DATA}'. Is the stream active elsewhere?")
+        print(f"Error: Unable to access the video feed from '{SOURCE_CAMERA}'. Is the stream active elsewhere?")
         return
+    
+    # Stream settings
+    current_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    current_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    current_fps = cap.get(cv2.CAP_PROP_FPS)
+    print(f"Resolution: {current_width}x{current_height}")
+    print(f"Frame Rate (FPS): {current_fps}")
 
-    while STATUS in ["get_raw", "get_back", "get_neck", "get_head"]:
+    # Initialize FPS calculation
+    fps = 0
+    bps = 0
+    frame_count = 0
+    bytes_count = 0
+    start_time = time.perf_counter()
+    start_bps_time = time.perf_counter()
+    while STATUS == "get_raw":
         ret, frame = cap.read()
         if not ret:
             print("Error: Unable to read frame from the video feed.")
-            break   # Using 'continue' allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
+            break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
-        # Pre-process the frame to match YOLO input size
-        frame_resized = cv2.resize(frame, (640, 640))               # Resize frame to the desired input size
-        frame_rgb = frame_resized[..., ::-1]                        # Convert BGR to RGB (YOLO typically expects RGB)
-        frame_normalized = frame_rgb / 255.0                        # Normalize the image (YOLO uses values in range [0, 1])
-        transform = transforms.ToTensor()                           # Convert to Tensor and add batch dimension
-        frame_tensor = transform(frame_normalized).unsqueeze(0)     # Add batch dimension
-        frame_tensor = frame_tensor.to(torch.float32)               # Convert to float32 as the first layer require
+        results = MODEL.predict(source=frame)
 
-        # Can also use this to pre-process
-        # input_tensor = cv2.resize(frame, (640, 640))
-        # input_tensor = input_tensor[..., ::-1]                            # Convert BGR to RGB
-        # input_tensor = np.copy(input_tensor)                              # Create a copy of the array to avoid negative strides
-        # input_tensor = np.transpose(input_tensor, (2, 0, 1))              # Change to (C, H, W)
-        # input_tensor = np.expand_dims(input_tensor, axis=0)               # Add batch dimension
-        # input_tensor = torch.from_numpy(input_tensor).float() / 255.0     # Normalize to [0, 1]
+        frame_count += 1                                        # Update the frame count
+        if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
+            elapsed_time = time.perf_counter() - start_time
+            if elapsed_time > 0:
+                fps = frame_count / elapsed_time
+            frame_count = 0                                     # Restart the counter
+            start_time = time.perf_counter()                    # Restart the times
 
-        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
-        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
-        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
-        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
-        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
-        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
-        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
-        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
-        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
-        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
+        extracted_res = {
+            'inference_time': results[0].speed['inference'],        # Espressed in ms
+            'boxes': results[0].boxes.data.tolist() if results[0].boxes else [],        # Contain: [x1, y1, x2, y2, confidence, class_id]
+            # 'keypoints': results[0].keypoints.data.tolist() if results[0].keypoints else [],
+            # 'masks': results[0].masks.data.tolist() if results[0].masks else [],
+            'names': results[0].names,
+            # 'path': results[0].path,
+        }
+        yoloFps = 1000/results[0].speed['inference']
+        box_groups = defaultdict(list)                  # Dictionary of boxes grouped by class ID
+        for box in extracted_res['boxes']:
+            class_id = box[5]                           # The 6th value represents the class ID
+            box_groups[class_id].append(box[:5])        # Append the box without the class ID
+        rewritten_res = {
+            'inference_time': extracted_res['inference_time'],
+            'box_count': {extracted_res['names'][class_id]: len(boxes) for class_id, boxes in box_groups.items()},
+            'boxes': box_groups,
+            'yolo_fps': yoloFps,
+            'fps': fps,
+            'names': extracted_res['names']
+        }
 
-        # Stage 2: Neck (Feature Refinement)
-        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
-        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
-        b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
-        b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
-        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
-        b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
-        b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
-        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
-        b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
-        b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
-        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
-        b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
-        b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
-        b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
+        # Overlay FPS, image size, and camera FPS on the frame
+        if(RUNNING_VIDEO):
+            cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
+            cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            if(STATS_PRINT):
+                cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                cv2.putText(frame, f"Yolo FPS: {yoloFps:.2f}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                (frame.shape[1] - cv2.getTextSize(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0][0] - 10, 
+                frame.shape[0] - 10), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 165, 255), 2)
 
-        # Stage 3: Head (Final Predictions)
-        b23 = MODEL.model.model[23]([b16,b19,b22])
+            # Encode the frame as JPEG
+            _, buffer = cv2.imencode('.jpg', results[0].plot())
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        else:
+            # Convert the result data dictionary to JSON string
+            result_json = json.dumps(rewritten_res)
 
-        # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
-        # TODO
+            if(STATS_PRINT):
+                bytes_sent = len(result_json)
+                bytes_count += bytes_sent                             # Update the bytes count
+                elapsed_time2 = time.perf_counter() - start_bps_time
+                if elapsed_time2 > 2:
+                    bps = bytes_count / elapsed_time2
+                    bytes_count = 0                                             # Restart the counter
+                    start_bps_time = time.perf_counter()                        # Restart the times
 
-        # predictions = b23[0]
-        # boxes = []
-        # for pred in predictions[0]:  # Assuming batch size is 1
-        #     x_center, y_center, w, h = pred[:4]  # Box coordinates
-        #     score = pred[4]  # Objectness score
-        #     class_scores = pred[5:]  # Class scores
-        #     class_id = torch.argmax(class_scores)
-        #     final_score = score * class_scores[class_id]
-        #     # Convert to [x1, y1, x2, y2] format
-        #     x1 = x_center - w / 2
-        #     y1 = y_center - h / 2
-        #     x2 = x_center + w / 2
-        #     y2 = y_center + h / 2
-        #     print([x1, y1, x2, y2, final_score, class_id])
-        #     # Append as [x1, y1, x2, y2, conf, cls]
-        #     boxes.append([x1, y1, x2, y2, final_score, class_id])
-        # # Convert to tensor
-        # boxes_tensor = torch.tensor(boxes)  # Shape: [num_detections, 6]
-        # # print(MODEL.names)
-        # my_dict = {i: str(i) for i in range(10001)}
-        # results = Results(path=None, orig_img=frame, boxes=boxes_tensor, names=my_dict)
-        # frame = results[0].plot()
+                print(f"Bytes of the frame: {bytes_sent}")
+                print(f"Frame per Seconds:  {fps}")
+                print(f"Bytes per Seconds:  {bps}")
 
-        # Convert the result data to JSON string
-        result_json = json.dumps(b23[0].tolist())
-
-        # Yield the JSON-encoded results
-        yield (b'--frame\r\n'
-               b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
-
+            # Yield the JSON-encoded results
+            yield (b'--frame\r\n'
+                b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
+        
     cap.release()
 
 def consume_back():
@@ -306,7 +497,139 @@ def consume_neck():
     return
     
 def consume_head():
-    return
+    print("magari")
+    tensor_socket.connect(('10.200.3.28', 5111))
+    print("riesco")
+
+    while STATUS in ["get_head"]:
+        try:
+            # Receive the total length of the data first (4 bytes)
+            data_length = struct.unpack('!I', tensor_socket.recv(4))[0]
+            print(f"Total data size: {data_length} bytes")
+
+            # Receive data in chunks and append to reconstruct the full data
+            buffer = b''  # To hold the entire serialized data
+            while len(buffer) < data_length:
+                chunk = tensor_socket.recv(min(1024, data_length - len(buffer)))  # Receive a chunk
+                buffer += chunk
+                print(f"Received {len(buffer)} bytes, waiting {data_length}")
+
+            if buffer:
+                # Deserialize the data
+                tensor = pickle.loads(buffer)
+                print(f"Received: {tensor}")
+                print(f"Received {len(buffer)} bytes")
+                print(type(tensor))
+                print(tensor.shape)
+            else:
+                print("No data recieved")
+                break
+        except Exception as e:
+            print(f"Error receiving data: {e}")
+            continue
+
+
+    # data = tensor_socket.recv(4096)  # Adjust buffer size as needed
+    # tensor = pickle.loads(data)
+    # print(f"Received: {tensor}")
+
+    # print("1")
+    # while STATUS in ["get_head"]:
+    #     print("2")
+    #     with requests.get(SOURCE_DATA, stream=True) as response:
+    #         buffer = b''
+    #         print("3")
+    #         for chunk in response.iter_content(chunk_size=1024):
+    #             if chunk:
+    #                 buffer += chunk
+    #                 print("4")
+    #                 if b'\n' in buffer:
+    #                     print("5")
+    #                     serialized_data, buffer = buffer.split(b'\n', 1)
+    #                     features_np = np.load(io.BytesIO(serialized_data))
+    #                     slice = torch.tensor(features_np)
+    #                     print("6")
+
+    #                     # Perform the remaining operations
+    #                     with torch.no_grad():
+    #                         # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
+    #                         # TODO
+    #                         print("7")
+    #                     print(f"qui '{slice}'")
+    #                     print("8")
+    #                     # buffer = b''
+
+
+        # results = MODEL.predict(source=frame)
+
+        # frame_count += 1                                        # Update the frame count
+        # if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
+        #     elapsed_time = time.perf_counter() - start_time
+        #     if elapsed_time > 0:
+        #         fps = frame_count / elapsed_time
+        #     frame_count = 0                                     # Restart the counter
+        #     start_time = time.perf_counter()                    # Restart the times
+
+        # extracted_res = {
+        #     'inference_time': results[0].speed['inference'],        # Espressed in ms
+        #     'boxes': results[0].boxes.data.tolist() if results[0].boxes else [],        # Contain: [x1, y1, x2, y2, confidence, class_id]
+        #     # 'keypoints': results[0].keypoints.data.tolist() if results[0].keypoints else [],
+        #     # 'masks': results[0].masks.data.tolist() if results[0].masks else [],
+        #     'names': results[0].names,
+        #     # 'path': results[0].path,
+        # }
+        # yoloFps = 1000/results[0].speed['inference']
+        # box_groups = defaultdict(list)                  # Dictionary of boxes grouped by class ID
+        # for box in extracted_res['boxes']:
+        #     class_id = box[5]                           # The 6th value represents the class ID
+        #     box_groups[class_id].append(box[:5])        # Append the box without the class ID
+        # rewritten_res = {
+        #     'inference_time': extracted_res['inference_time'],
+        #     'box_count': {extracted_res['names'][class_id]: len(boxes) for class_id, boxes in box_groups.items()},
+        #     'boxes': box_groups,
+        #     'yolo_fps': yoloFps,
+        #     'fps': fps,
+        #     'names': extracted_res['names']
+        # }
+
+        # # Overlay FPS, image size, and camera FPS on the frame
+        # if(RUNNING_VIDEO):
+        #     cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
+        #     cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        #     if(STATS_PRINT):
+        #         cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        #         cv2.putText(frame, f"Yolo FPS: {yoloFps:.2f}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        #     cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+        #         (frame.shape[1] - cv2.getTextSize(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0][0] - 10, 
+        #         frame.shape[0] - 10), 
+        #         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 165, 255), 2)
+
+        #     # Encode the frame as JPEG
+        #     _, buffer = cv2.imencode('.jpg', results[0].plot())
+        #     frame_bytes = buffer.tobytes()
+        #     yield (b'--frame\r\n'
+        #         b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        # else:
+        #     # Convert the result data dictionary to JSON string
+        #     result_json = json.dumps(rewritten_res)
+
+        #     if(STATS_PRINT):
+        #         bytes_sent = len(result_json)
+        #         bytes_count += bytes_sent                             # Update the bytes count
+        #         elapsed_time2 = time.perf_counter() - start_bps_time
+        #         if elapsed_time2 > 2:
+        #             bps = bytes_count / elapsed_time2
+        #             bytes_count = 0                                             # Restart the counter
+        #             start_bps_time = time.perf_counter()                        # Restart the times
+
+        #         print(f"Bytes of the frame: {bytes_sent}")
+        #         print(f"Frame per Seconds:  {fps}")
+        #         print(f"Bytes per Seconds:  {bps}")
+
+        #     # Yield the JSON-encoded results
+        #     yield (b'--frame\r\n'
+        #         b'Content-Type: application/json\r\n\r\n' + result_json.encode('utf-8') + b'\r\n')
+        
 
 ###
 #   ENDPOINTS
@@ -340,7 +663,7 @@ def stream_neck():
 @app.route("/stream_head")
 def stream_head():
     global STATUS
-    if STATUS not in ["get_raw", "get_back", "get_neck", "get_head"]:
+    if STATUS not in ["send_head"]:
         return "Head stream not active", 400
     return Response(generate_head(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
