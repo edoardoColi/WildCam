@@ -1,5 +1,7 @@
 import os
+import io
 import cv2
+import sys
 import json
 import time
 import torch
@@ -9,12 +11,13 @@ import struct
 import requests
 import datetime
 import threading
+import lz4.frame
 import numpy as np
 from ultralytics import YOLO
 from torchvision import transforms
 from collections import defaultdict
 from ultralytics.engine.results import Results
-from flask import Flask, request, jsonify, Response, redirect
+from flask import Flask, request, jsonify, Response, redirect # type: ignore
 
 app = Flask(__name__)
 
@@ -27,7 +30,7 @@ SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
 SOURCE_DATA = 'none'                                    # Customize for the inference source
 DEVICE_IP = '10.200.3.28'
 MODEL_FOLDER = 'models/'
-MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)
+MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
 MODEL = MODEL.to('cuda')
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
@@ -44,6 +47,56 @@ app.config['MODEL_FOLDER'] = MODEL_FOLDER
 os.makedirs(MODEL_FOLDER, exist_ok=True)
 
 tensor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+def get_the_size(obj, seen=None):
+    if seen is None:
+        seen = set()
+
+    # Handle circular references
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    seen.add(obj_id)
+
+    size = sys.getsizeof(obj)  # Base size of the object
+
+    # Handle specific types
+    if isinstance(obj, torch.Tensor):
+        size += obj.element_size() * obj.numel()  # Tensor's data size
+    elif isinstance(obj, (list, tuple, set, frozenset)):
+        size += sum(get_the_size(item, seen) for item in obj)  # Sum sizes of elements
+    elif isinstance(obj, dict):
+        size += sum(get_the_size(k, seen) + get_the_size(v, seen) for k, v in obj.items())  # Keys and values
+    elif hasattr(obj, '__dict__'):
+        size += get_the_size(vars(obj), seen)  # Object's attributes
+    elif hasattr(obj, '__slots__'):
+        size += sum(get_the_size(getattr(obj, slot), seen) for slot in obj.__slots__ if hasattr(obj, slot))
+
+    return size
+
+def compress_tensor(tensor):
+    # Serialize the tensor to bytes using BytesIO
+    buffer = io.BytesIO()
+    torch.save(tensor, buffer)
+    buffer.seek(0)
+    tensor_bytes = buffer.read()
+
+    # Compress the serialized tensor data using lz4
+    compressed_tensor = lz4.frame.compress(tensor_bytes)
+
+    return compressed_tensor
+
+def decompress_tensor(compressed_tensor):
+    # Decompress the tensor data using lz4
+    decompressed_tensor_bytes = lz4.frame.decompress(compressed_tensor)
+
+    # Convert back to tensor
+    buffer = io.BytesIO(decompressed_tensor_bytes)
+    buffer.seek(0)
+    decompressed_tensor = torch.load(buffer)
+
+    return decompressed_tensor
+
 ###
 #   OPERATIVE PARTS (as capable device)
 ###
@@ -51,7 +104,7 @@ tensor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 ### yield is a keyword in Python that allows a function to return a value and pause its execution, so that it can later resume where it left off
 
 def generate_raw():
-    print(f"Neck stream prepering on {DEVICE_IP}:5111")
+    print(f"Raw stream prepering on {DEVICE_IP}:5111")
     try:
         tensor_socket.bind((DEVICE_IP, 5111))
         tensor_socket.listen(1)
@@ -59,7 +112,7 @@ def generate_raw():
         print(f"Error in socket: {e}. Check with 'netstat -tuln| grep 5111'")
         tensor_socket.close()
         return
-    print("Neck stream is ready")
+    print("Raw stream is ready")
     conn, addr = tensor_socket.accept()
     print("Connection...")
     cap = cv2.VideoCapture(SOURCE_CAMERA)
@@ -93,8 +146,8 @@ def generate_raw():
 
         # Overlay FPS, image size, and camera FPS on the frame
         if(RUNNING_VIDEO):
-            cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
-            cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            # cv2.putText(frame, f"Image Size: {current_width}x{current_height}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)    # The triplete (x, x, x) is the color of the text
+            # cv2.putText(frame, f"Frame Rate: {current_fps:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
             if(STATS_PRINT):
                 cv2.putText(frame, f"Estimated FPS: {fps:.2f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
             cv2.putText(frame, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
@@ -574,7 +627,7 @@ def generate_inf():
             print("Error: Unable to read frame from the video feed.")
             break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
 
-        results = MODEL.predict(source=frame)
+        results = MODEL.predict(source=frame,device=0)
 
         frame_count += 1                                        # Update the frame count
         if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
