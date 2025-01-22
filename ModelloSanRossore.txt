@@ -314,7 +314,7 @@ Layer 22: Detect(
         (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
         (act): SiLU(inplace=True)
       )
-      (2): Conv2d(192, 80, kernel_size=(1, 1), stride=(1, 1))
+      (2): Conv2d(192, 5, kernel_size=(1, 1), stride=(1, 1))
     )
     (1): Sequential(
       (0): Conv(
@@ -327,7 +327,7 @@ Layer 22: Detect(
         (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
         (act): SiLU(inplace=True)
       )
-      (2): Conv2d(192, 80, kernel_size=(1, 1), stride=(1, 1))
+      (2): Conv2d(192, 5, kernel_size=(1, 1), stride=(1, 1))
     )
     (2): Sequential(
       (0): Conv(
@@ -340,7 +340,7 @@ Layer 22: Detect(
         (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
         (act): SiLU(inplace=True)
       )
-      (2): Conv2d(192, 80, kernel_size=(1, 1), stride=(1, 1))
+      (2): Conv2d(192, 5, kernel_size=(1, 1), stride=(1, 1))
     )
   )
   (dfl): DFL(

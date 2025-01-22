@@ -30,3 +30,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
     runtime: nvidia       # Enables GPU-accelerated workloads, without this runtime the container cannot utilize GPU hardware
     network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access
+
+  graph_flask:
+    build: ./Graph
+    container_name: yolo_graph
+    environment:
+      - RUNNING_PORT=5020
+      - STREAM_URL=http://10.200.3.28:5000/stream_inf
+    network_mode: host    # Useful for performance-critical applications like those requiring low-latency networking or GPU access

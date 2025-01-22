@@ -30,7 +30,8 @@ SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
 SOURCE_DATA = 'none'                                    # Customize for the inference source
 DEVICE_IP = '10.200.3.28'
 MODEL_FOLDER = 'models/'
-MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolo11n.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
+MODEL = YOLO(f'{MODEL_FOLDER}Yolo/bestSanRossore.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
+# MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolov8m.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
 MODEL = MODEL.to('cuda')
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
@@ -318,16 +319,16 @@ def generate_back():
         # MODEL = MODEL.to('cuda')                    # Move the model to GPU
         frame_tensor = frame_tensor.to('cuda')      # Ensure the input tensor is on the same device as the model
 
-        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
-        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
-        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
-        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
-        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
-        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
-        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
-        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
-        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
-        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
+        # Stage 1: Backbone (feature extraction)
+        b0 = MODEL.model.model[0](frame_tensor)
+        b1 = MODEL.model.model[1](b0)
+        b2 = MODEL.model.model[2](b1)
+        b3 = MODEL.model.model[3](b2)
+        b4 = MODEL.model.model[4](b3)
+        b5 = MODEL.model.model[5](b4)
+        b6 = MODEL.model.model[6](b5)
+        b7 = MODEL.model.model[7](b6)
+        b8 = MODEL.model.model[8](b7)
 
         slice = [b6,b4,b8]
 
@@ -420,34 +421,33 @@ def generate_neck():
         # MODEL = MODEL.to('cuda')                    # Move the model to GPU
         frame_tensor = frame_tensor.to('cuda')      # Ensure the input tensor is on the same device as the model
 
-        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
-        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
-        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
-        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
-        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
-        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
-        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
-        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
-        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
-        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
+        # Stage 1: Backbone (feature extraction)
+        b0 = MODEL.model.model[0](frame_tensor)
+        b1 = MODEL.model.model[1](b0)
+        b2 = MODEL.model.model[2](b1)
+        b3 = MODEL.model.model[3](b2)
+        b4 = MODEL.model.model[4](b3)
+        b5 = MODEL.model.model[5](b4)
+        b6 = MODEL.model.model[6](b5)
+        b7 = MODEL.model.model[7](b6)
+        b8 = MODEL.model.model[8](b7)
 
         # Stage 2: Neck (Feature Refinement)
-        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
-        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
-        b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
-        b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
-        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
-        b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
-        b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
-        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
-        b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
-        b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
-        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
-        b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
-        b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
-        b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
+        b9 = MODEL.model.model[9](b8)
+        b10 = MODEL.model.model[10](b9)
+        b11 = MODEL.model.model[11]([b10,b6])
+        b12 = MODEL.model.model[12](b11)
+        b13 = MODEL.model.model[13](b12)
+        b14 = MODEL.model.model[14]([b13,b4])
+        b15 = MODEL.model.model[15](b14)
+        b16 = MODEL.model.model[16](b15)
+        b17 = MODEL.model.model[17]([b16,b12])
+        b18 = MODEL.model.model[18](b17)
+        b19 = MODEL.model.model[19](b18)
+        b20 = MODEL.model.model[20]([b19,b9])
+        b21 = MODEL.model.model[21](b20)
 
-        slice = [b16,b19,b22]
+        slice = [b15,b18,b21]
 
         serialized_tensor = pickle.dumps(slice)
         # Split the data into chunks for big datas
@@ -538,35 +538,34 @@ def generate_head():
         # MODEL = MODEL.to('cuda')                    # Move the model to GPU
         frame_tensor = frame_tensor.to('cuda')      # Ensure the input tensor is on the same device as the model
 
-        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR YOLO11n.pt!
-        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 16, 320, 320])
-        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 32, 160, 160])
-        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 64, 160, 160])
-        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 64, 80, 80])
-        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 128, 80, 80])
-        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 128, 40, 40])
-        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 128, 40, 40])
-        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 256, 20, 20])
-        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 256, 20, 20])
+        # Stage 1: Backbone (feature extraction)    # Input a torch.Size([1, 3, 640, 640]) !FOR yolov8 SanRossore.pt!
+        b0 = MODEL.model.model[0](frame_tensor)     # Output a torch.Size([1, 48, 320, 320])
+        b1 = MODEL.model.model[1](b0)               # Output a torch.Size([1, 96, 160, 160])
+        b2 = MODEL.model.model[2](b1)               # Output a torch.Size([1, 96, 160, 160])
+        b3 = MODEL.model.model[3](b2)               # Output a torch.Size([1, 192, 80, 80])
+        b4 = MODEL.model.model[4](b3)               # Output a torch.Size([1, 192, 80, 80])
+        b5 = MODEL.model.model[5](b4)               # Output a torch.Size([1, 384, 40, 40])
+        b6 = MODEL.model.model[6](b5)               # Output a torch.Size([1, 384, 40, 40])
+        b7 = MODEL.model.model[7](b6)               # Output a torch.Size([1, 576, 20, 20])
+        b8 = MODEL.model.model[8](b7)               # Output a torch.Size([1, 576, 20, 20])
 
         # Stage 2: Neck (Feature Refinement)
-        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
-        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
-        b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
-        b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
-        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
-        b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
-        b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
-        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
-        b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
-        b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
-        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
-        b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
-        b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
-        b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
+        b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 576, 20, 20])
+        b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 576, 40, 40])
+        b11 = MODEL.model.model[11]([b10,b6])       # Output a torch.Size([1, 960, 40, 40])
+        b12 = MODEL.model.model[12](b11)            # Output a torch.Size([1, 384, 40, 40])
+        b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 384, 80, 80])
+        b14 = MODEL.model.model[14]([b13,b4])       # Output a torch.Size([1, 576, 80, 80])
+        b15 = MODEL.model.model[15](b14)            # Output a torch.Size([1, 192, 80, 80])
+        b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 192, 40, 40])
+        b17 = MODEL.model.model[17]([b16,b12])      # Output a torch.Size([1, 576, 40, 40])
+        b18 = MODEL.model.model[18](b17)            # Output a torch.Size([1, 384, 40, 40])
+        b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 384, 20, 20])
+        b20 = MODEL.model.model[20]([b19,b9])       # Output a torch.Size([1, 960, 20, 20])
+        b21 = MODEL.model.model[21](b20)            # Output a torch.Size([1, 576, 20, 20])
 
         # Stage 3: Head (Final Predictions)
-        slice = MODEL.model.model[23]([b16,b19,b22])
+        slice = MODEL.model.model[22]([b15,b18,b21])
 
         serialized_tensor = pickle.dumps(slice)
         # Split the data into chunks for big datas
@@ -973,23 +972,22 @@ def consume_back():
                 b6 = slice[0].to('cuda')      # Ensure the input tensor is on the same device as the model
                 b4 = slice[1].to('cuda')      # Ensure the input tensor is on the same device as the model
                 b8 = slice[2].to('cuda')      # Ensure the input tensor is on the same device as the model
-                b9 = MODEL.model.model[9](b8)               # Output a torch.Size([1, 256, 20, 20])
-                b10 = MODEL.model.model[10](b9)             # Output a torch.Size([1, 256, 20, 20])
-                b11 = MODEL.model.model[11](b10)            # Output a torch.Size([1, 256, 40, 40])
-                b12 = MODEL.model.model[12]([b11,b6])       # Output a torch.Size([1, 384, 40, 40])
-                b13 = MODEL.model.model[13](b12)            # Output a torch.Size([1, 128, 40, 40])
-                b14 = MODEL.model.model[14](b13)            # Output a torch.Size([1, 128, 80, 80])
-                b15 = MODEL.model.model[15]([b14,b4])       # Output a torch.Size([1, 256, 80, 80])
-                b16 = MODEL.model.model[16](b15)            # Output a torch.Size([1, 64, 80, 80])
-                b17 = MODEL.model.model[17](b16)            # Output a torch.Size([1, 64, 40, 40])
-                b18 = MODEL.model.model[18]([b17,b13])      # Output a torch.Size([1, 192, 40, 40])
-                b19 = MODEL.model.model[19](b18)            # Output a torch.Size([1, 128, 40, 40])
-                b20 = MODEL.model.model[20](b19)            # Output a torch.Size([1, 128, 20, 20])
-                b21 = MODEL.model.model[21]([b20,b10])      # Output a torch.Size([1, 384, 20, 20])
-                b22 = MODEL.model.model[22](b21)            # Output a torch.Size([1, 256, 20, 20])
+                b9 = MODEL.model.model[9](b8)
+                b10 = MODEL.model.model[10](b9)
+                b11 = MODEL.model.model[11]([b10,b6])
+                b12 = MODEL.model.model[12](b11)
+                b13 = MODEL.model.model[13](b12)
+                b14 = MODEL.model.model[14]([b13,b4])
+                b15 = MODEL.model.model[15](b14)
+                b16 = MODEL.model.model[16](b15)
+                b17 = MODEL.model.model[17]([b16,b12])
+                b18 = MODEL.model.model[18](b17)
+                b19 = MODEL.model.model[19](b18)
+                b20 = MODEL.model.model[20]([b19,b9])
+                b21 = MODEL.model.model[21](b20)
 
                 # Stage 3: Head (Final Predictions)
-                b23 = MODEL.model.model[23]([b16,b19,b22])
+                b23 = MODEL.model.model[22]([b15,b18,b21])
 
                 # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
                 # TODO
@@ -1054,10 +1052,10 @@ def consume_neck():
                 slice = pickle.loads(buffer)
 
                 # Stage 3: Head (Final Predictions)
-                b16 = slice[0].to('cuda')      # Ensure the input tensor is on the same device as the model
-                b19 = slice[1].to('cuda')      # Ensure the input tensor is on the same device as the model
-                b22 = slice[2].to('cuda')      # Ensure the input tensor is on the same device as the model
-                b23 = MODEL.model.model[23]([b16,b19,b22])
+                b15 = slice[0].to('cuda')      # Ensure the input tensor is on the same device as the model
+                b18 = slice[1].to('cuda')      # Ensure the input tensor is on the same device as the model
+                b21 = slice[2].to('cuda')      # Ensure the input tensor is on the same device as the model
+                b23 = MODEL.model.model[22]([b15,b18,b21])
 
                 # Post-process the predictions, converting predictions into bounding boxes, confidences, and class IDs
                 # TODO
