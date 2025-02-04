@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Ultralytics YOLO on NVIDIA Jetson Orin🚀</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #8DC21F;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 1200px;
+            flex-wrap: wrap;
+        }
+        .form-container, .result-container {
+            background: #1f1f1f;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            margin: 20px;
+            flex: 1;
+            min-width: 300px;
+        }
+        .form-container {
+            max-width: 400px;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #aab2b5;
+        }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: 1px solid #fffdfd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background-color: #cecccc;
+            color: #003A4A;
+        }
+        button {
+            background-color: #1db954;
+            color: #003A4A;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            width: calc(50% - 10px);
+        }
+        button:hover {
+            background-color: #14833b;
+        }
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        #result img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            margin-top: 15px;
+            border: 1px solid #fffdfd;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(44, 44, 44, 0.3);
+        }
+        #progress {
+            width: 100%;
+            background-color: #fffdfd;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: none;
+        }
+        #progress-bar {
+            width: 0;
+            height: 20px;
+            background-color: #1db954;
+            border-radius: 6px;
+        }
+        #fps-display {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            background-color: #333333;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 0px;
+            text-align: center;
+        }
+        #loading-message {
+            display: none;
+            color: #1db954;
+            font-size: 1.2em;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .result-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <h1>Run Ultralytics YOLO on NVIDIA Jetson Orin 🚀</h1>
+    <div class="links-container words"></div>
+        <a href="https://github.com/ZhuYaoHui1998/jetson-examples/tree/main/reComputer/scripts/ultralytics-yolo">📰 How-to Guides: Train a YOLO Model, Accelerate with TensorRT, MultiStream Ultralytics Guides</a>
+    </div>
+    <div class="container">
+        <div class="form-container">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <label for="version">Choose YOLO version:</label>
+                <select name="version" id="version">
+                    {% for version in model_versions %}
+                    <option value="{{ version }}">{{ version }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="model">Choose model:</label>
+                <select name="model" id="model">
+                    <option value="">-- Select model --</option>
+                </select>
+
+                <!-- Custom Model Upload -->
+                <div id="custom-model-upload" style="display: none;">
+                    <label for="custom_model">Upload custom model (.pt file):</label>
+                    <input type="file" name="custom_model" id="custom_model">
+                </div>
+
+                <label for="input_type">Choose input type:</label>
+                <select name="input_type" id="input_type">
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="webcam">Webcam</option>
+                </select>
+
+                <div id="upload-controls">
+                    <label for="file">Upload file:</label>
+                    <input type="file" name="file" id="file">
+                </div>
+
+                <label for="tensorrt">Enable TensorRT:</label>
+                <input type="checkbox" name="tensorrt" id="tensorrt">
+            </form>
+
+            <div id="controls">
+                <button id="startButton">Start</button>
+                <button id="stopButton">Stop</button>
+            </div>
+
+            <div id="progress">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="result-container">
+            <div id="fps-display">FPS: 0</div>
+            <div id="result"></div>
+            <div id="loading-message">Loading/Converting the model.</div>
+        </div>
+    </div>
+
+    <script>
+        const modelOptions = {{ model_versions | tojson }};
+
+        // 当选择 YOLO 版本时，更新模型选项
+        document.getElementById('version').addEventListener('change', function() {
+            const version = this.value;
+            const modelSelect = document.getElementById('model');
+            modelSelect.innerHTML = '<option value="">-- Select model --</option>';
+
+            const models = modelOptions[version] || [];
+
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+
+            // 添加一个 "Custom Model" 选项
+            const customOption = document.createElement('option');
+            customOption.value = 'custom';
+            customOption.textContent = 'Custom Model';
+            modelSelect.appendChild(customOption);
+        });
+
+        document.getElementById('model').addEventListener('change', function() {
+            const customModelUpload = document.getElementById('custom-model-upload');
+            if (this.value === 'custom') {
+                customModelUpload.style.display = 'block';
+            } else {
+                customModelUpload.style.display = 'none';
+            }
+        });
+
+        document.getElementById('input_type').addEventListener('change', function() {
+            const uploadControls = document.getElementById('upload-controls');
+            if (this.value === 'webcam') {
+                uploadControls.style.display = 'none';
+            } else {
+                uploadControls.style.display = 'block';
+            }
+        });
+
+        document.getElementById('startButton').addEventListener('click', function() {
+            const formData = new FormData(document.getElementById('uploadForm'));
+            formData.set('input_type', document.getElementById('input_type').value);
+            formData.set('tensorrt', document.getElementById('tensorrt').checked);
+
+            const loadingMessage = document.getElementById('loading-message');
+            loadingMessage.style.display = 'block';
+
+            fetch('/detect', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.image || data.video || data.webcam) {
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.innerHTML = '';
+
+                    if (data.error) {
+                        resultDiv.textContent = data.error;
+                    } else {
+                        const img = document.createElement('img');
+                        img.id = 'feed';
+                        img.src = '/video_feed';
+                        img.alt = 'The first boot may take 30 seconds';
+                        resultDiv.appendChild(img);
+
+                        const fpsDisplay = document.getElementById('fps-display');
+                        setInterval(() => {
+                            fetch('/results')
+                                .then(response => response.json())
+                                .then(data => {
+                                    fpsDisplay.textContent = `FPS: ${data.fps.toFixed(2)}`;
+                                });
+                        }, 1000);
+                        setInterval(() => {
+                            fetch('/loading_status')
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.loading === 0) {
+                                        loadingMessage.style.display = 'block';
+                                    } else {
+                                        loadingMessage.style.display = 'none';
+                                    }
+                                });
+                        }, 1000);
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        document.getElementById('stopButton').addEventListener('click', function() {
+            fetch('/stop_camera', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.stopped) {
+                    location.reload();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+        <div class="links-container words">
+            <a href="https://github.com/Seeed-Projects/jetson-examples">👀Explore more projects at Jetson-Example</a>
+        </div>
+
+        <div class="links-container words">
+            <b href="https://github.com/Seeed-Projects/jetson-examples">Build with 💖 by Seeed Studio team.</b>
+        </div>
+</body>
+</html>

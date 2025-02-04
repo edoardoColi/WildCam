@@ -154,6 +154,27 @@ reComputer run ultralytics-yolo
 #enter http://device_ip:5000 to access WebUI
 ```
 
+### .pt model to .engine
+Have to pass trough the onnx format. Using python and YOLO from ultralytics we can say to open the `.pt` model and export in `.onnx`  
+After this we can use `trtexec --onnx=yolomodel.pt --saveEngine=yoloModel.engine --fp16`. If not present the command do:
+```
+apt update
+apt install tensorrt python3-libnvinfer libnvinfer-bin
+
+# if is in the directory export the path
+ls /usr/src/tensorrt/bin
+export PATH=$PATH:/usr/src/tensorrt/bin
+
+# test with
+trtexec --version
+```
+informations regarding the engine model can be retrieved using
+```
+trtexec --loadEngine=yolo11x.engine --dumpLayerInfo
+
+trtexec --loadEngine=yolov8m.engine --exportProfile=profile8m.json
+```
+
 <!-- # Hardware Compatibility tips
 
 ###
