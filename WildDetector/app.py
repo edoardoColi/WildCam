@@ -30,9 +30,12 @@ SOURCE_CAMERA = 0                                       # Refer to '/dev/video0'
 SOURCE_DATA = 'none'                                    # Customize for the inference source
 DEVICE_IP = '192.168.6.204'
 MODEL_FOLDER = 'models/'
+model_path = "models/Yolo/yolov8m.pt"
+# model_path = "models/Yolo/bestSanRossore.pt"
 # MODEL = YOLO(f'{MODEL_FOLDER}Yolo/bestSanRossore.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
 MODEL = YOLO(f'{MODEL_FOLDER}Yolo/yolov8m.pt')          # [print(f"Layer {i}: {layer}") for i, layer in enumerate(MODEL.model.model)]
 MODEL = MODEL.to('cuda')
+MODEL_E = False
 BACKBONE = MODEL.model.model[0]                         # Backbone part of the model
 NECK = MODEL.model.model[1]                             # Neck part of the model
 HEAD = MODEL.model.model[2]                             # Head part of the model
@@ -73,7 +76,7 @@ def get_the_size(obj, seen=None):
     elif hasattr(obj, '__slots__'):
         size += sum(get_the_size(getattr(obj, slot), seen) for slot in obj.__slots__ if hasattr(obj, slot))
 
-    return size
+    return (size * 8)
 
 def compress_tensor(tensor):
     # Serialize the tensor to bytes using BytesIO
@@ -162,7 +165,11 @@ def generate_raw():
         # Split the data into chunks for big datas
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_frame)
-
+        
+        
+        print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_frame)} Bits")
+        
+        
         if(STATS_PRINT):
             bytes_sent = len(serialized_frame)
             bytes_count += bytes_sent                             # Update the bytes count
@@ -239,6 +246,8 @@ def generate_jpg():
         print(len(frame.tobytes()))
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
+        print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
+
         print(len(frame_bytes))
         if(STATS_PRINT):
             bytes_sent = len(frame_bytes)
@@ -336,6 +345,7 @@ def generate_back():
         # Split the data into chunks for big datas
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
+        print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -453,6 +463,7 @@ def generate_neck():
         # Split the data into chunks for big datas
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
+        print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -571,6 +582,7 @@ def generate_head():
         # Split the data into chunks for big datas
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
+        print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -620,13 +632,29 @@ def generate_inf():
     bytes_count = 0
     start_time = time.perf_counter()
     start_bps_time = time.perf_counter()
+    if(MODEL_E):
+        engine_path = model_path.replace('.pt', '.engine')
+        if os.path.exists(engine_path):
+            current_model = YOLO(engine_path)
+        else:
+            print(f"Exporting model {model_path} to TensorRT format...")
+            model = YOLO(model_path)
+            model.export(format='engine', device=0)  # 指定设备
+            while not os.path.exists(engine_path):
+                time.sleep(1)
+            print(f"TensorRT engine exported and saved to {engine_path}")
+            current_model = YOLO(engine_path)
+
     while STATUS == "send_inf":
         ret, frame = cap.read()
         if not ret:
             print("Error: Unable to read frame from the video feed.")
             break   # Using continue allows the loop to skip the current iteration and attempt to read the next frame. This approach assumes that the issue is transient and the video feed will resume
-
-        results = MODEL.predict(source=frame,device=0)
+        if(MODEL_E):
+            results = current_model(frame)
+        else:
+            results = MODEL.predict(source=frame,device=0)
+            
 
         frame_count += 1                                        # Update the frame count
         if frame_count % 30 == 0:                               # Calculate FPS every 30 frames
@@ -673,11 +701,13 @@ def generate_inf():
             # Encode the frame as JPEG
             _, buffer = cv2.imencode('.jpg', results[0].plot())
             frame_bytes = buffer.tobytes()
+            print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
             yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         else:
             # Convert the result data dictionary to JSON string
             result_json = json.dumps(rewritten_res)
+            print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
 
             if(STATS_PRINT):
                 bytes_sent = len(result_json)
@@ -741,11 +771,11 @@ def consume_raw():
 
     # Initialize FPS calculation
     fps = 0
-    # bps = 0
+    bps = 0
     frame_count = 0
-    # bytes_count = 0
+    bytes_count = 0
     start_time = time.perf_counter()
-    # start_bps_time = time.perf_counter()
+    start_bps_time = time.perf_counter()
     while STATUS in ["get_raw"]:
         try:
             # Receive the total length of the data first (4 bytes)
@@ -806,11 +836,13 @@ def consume_raw():
                     # Encode the frame as JPEG
                     _, buffer = cv2.imencode('.jpg', results[0].plot())
                     frame_bytes = buffer.tobytes()
+                    print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
                     yield (b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 else:
                     # Convert the result data dictionary to JSON string
                     result_json = json.dumps(rewritten_res)
+                    print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
 
                     if(STATS_PRINT):
                         bytes_sent = len(result_json)
@@ -913,11 +945,13 @@ def consume_jpg():
             # Encode the frame as JPEG
             _, buffer = cv2.imencode('.jpg', results[0].plot())
             frame_bytes = buffer.tobytes()
+            print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
             yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         else:
             # Convert the result data dictionary to JSON string
             result_json = json.dumps(rewritten_res)
+            print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
 
             if(STATS_PRINT):
                 bytes_sent = len(result_json)
@@ -1297,11 +1331,16 @@ def home():
     return """
     <h1>Flask Wild Detector Control Panel</h1>
     <form action="/set_env" method="POST">
-        <label>Set SOURCE_DATA, actually '{source_data}':</label>
+        <label>Set external data source, actually '{source_data}':</label>
         <input type="text" name="value">
         <button type="submit">Set</button>
     </form>
-    <form action="/change_status" method="POST">
+    <form action="/set_env" method="POST">
+        <form action="/change_status" method="POST">
+        <label>Set inference model, actually 'yolov8m.pt':</label>
+        <input type="text" name="value2">
+        <button type="submit">Set</button>
+    </form>
         <label>Change Status:</label>
         <select name="status">
             <option value="idle">Idle</option>
