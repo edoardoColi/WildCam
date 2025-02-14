@@ -1341,6 +1341,7 @@ def home():
         <input type="text" name="value2">
         <button type="submit">Set</button>
     </form>
+    <form action="/change_status" method="POST">
         <label>Change Status:</label>
         <select name="status">
             <option value="idle">Idle</option>
