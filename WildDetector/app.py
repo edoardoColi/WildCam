@@ -168,6 +168,7 @@ def generate_raw():
         
         
         print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_frame)} Bits")
+        print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
         
         
         if(STATS_PRINT):
@@ -247,6 +248,7 @@ def generate_jpg():
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
         print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
+        print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
         print(len(frame_bytes))
         if(STATS_PRINT):
@@ -346,6 +348,7 @@ def generate_back():
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
         print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
+        print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -464,6 +467,7 @@ def generate_neck():
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
         print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
+        print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -583,6 +587,7 @@ def generate_head():
         chunk_size = 1024  # Size of each chunk (in bytes)
         data_length = len(serialized_tensor)
         print(f"-------------------> Size of FRAME sent in bits: {get_the_size(serialized_tensor)} Bits")
+        print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
         if(STATS_PRINT):
             bytes_sent = data_length
@@ -702,12 +707,14 @@ def generate_inf():
             _, buffer = cv2.imencode('.jpg', results[0].plot())
             frame_bytes = buffer.tobytes()
             print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
+            print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
             yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         else:
             # Convert the result data dictionary to JSON string
             result_json = json.dumps(rewritten_res)
             print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
+            print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
             if(STATS_PRINT):
                 bytes_sent = len(result_json)
@@ -837,12 +844,14 @@ def consume_raw():
                     _, buffer = cv2.imencode('.jpg', results[0].plot())
                     frame_bytes = buffer.tobytes()
                     print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
+                    print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
                     yield (b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 else:
                     # Convert the result data dictionary to JSON string
                     result_json = json.dumps(rewritten_res)
                     print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
+                    print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
                     if(STATS_PRINT):
                         bytes_sent = len(result_json)
@@ -946,12 +955,14 @@ def consume_jpg():
             _, buffer = cv2.imencode('.jpg', results[0].plot())
             frame_bytes = buffer.tobytes()
             print(f"-------------------> Size of FRAME sent in bits: {get_the_size(frame_bytes)} Bits")
+            print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
             yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         else:
             # Convert the result data dictionary to JSON string
             result_json = json.dumps(rewritten_res)
             print(f"-------------------> Size of FRAME sent in bits: {get_the_size(result_json)} Bits")
+            print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
 
             if(STATS_PRINT):
                 bytes_sent = len(result_json)
@@ -1036,6 +1047,9 @@ def consume_back():
                         fps = frame_count / elapsed_time
                     frame_count = 0                                     # Restart the counter
                     start_time = time.perf_counter()                    # Restart the times
+
+                print(f"-------------------> Size of FRAME sent in bits: {get_the_size(b23)} Bits")
+                print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
                 if(STATS_PRINT):
                     # bytes_sent = len(result_json)
                     # bytes_count += bytes_sent                             # Update the bytes count
@@ -1104,6 +1118,8 @@ def consume_neck():
                         fps = frame_count / elapsed_time
                     frame_count = 0                                     # Restart the counter
                     start_time = time.perf_counter()                    # Restart the times
+                print(f"-------------------> Size of FRAME sent in bits: {get_the_size(b23)} Bits")
+                print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
                 if(STATS_PRINT):
                     # bytes_sent = len(result_json)
                     # bytes_count += bytes_sent                             # Update the bytes count
@@ -1166,6 +1182,8 @@ def consume_head():
                         fps = frame_count / elapsed_time
                     frame_count = 0                                     # Restart the counter
                     start_time = time.perf_counter()                    # Restart the times
+                print(f"-------------------> Size of FRAME sent in bits: {get_the_size(slice)} Bits")
+                print(f"-------------------> Streaming at {fps} FRAME PER SECOND")
                 if(STATS_PRINT):
                     # bytes_sent = len(result_json)
                     # bytes_count += bytes_sent                             # Update the bytes count
